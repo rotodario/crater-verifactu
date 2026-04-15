@@ -76,4 +76,8 @@ export default {
   // settings
   MANAGE_NOTE: 'manage-all-notes',
   VIEW_NOTE: 'view-all-notes',
+
+  // VERI*FACTU
+  VIEW_VERIFACTU: 'view-verifactu',
+  MANAGE_VERIFACTU: 'manage-verifactu',
 }

@@ -17,6 +17,7 @@ use Crater\Policies\RecurringInvoicePolicy;
 use Crater\Policies\ReportPolicy;
 use Crater\Policies\SettingsPolicy;
 use Crater\Policies\UserPolicy;
+use Crater\Policies\VerifactuPolicy;
 use Gate;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 
@@ -43,6 +44,7 @@ class AuthServiceProvider extends ServiceProvider
         \Crater\Models\Unit::class => \Crater\Policies\UnitPolicy::class,
         \Crater\Models\RecurringInvoice::class => \Crater\Policies\RecurringInvoicePolicy::class,
         \Crater\Models\ExchangeRateProvider::class => \Crater\Policies\ExchangeRateProviderPolicy::class,
+        \Crater\Models\VerifactuRecord::class => \Crater\Policies\VerifactuPolicy::class,
     ];
 
     /**

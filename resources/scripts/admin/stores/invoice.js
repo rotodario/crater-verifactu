@@ -343,6 +343,24 @@ export const useInvoiceStore = (useWindow = false) => {
         })
       },
 
+      issueFiscally(data) {
+        return new Promise((resolve, reject) => {
+          axios
+            .post(`/api/v1/invoices/${data.id}/issue`)
+            .then((response) => {
+              notificationStore.showNotification({
+                type: 'success',
+                message: 'Factura expedida fiscalmente.',
+              })
+              resolve(response)
+            })
+            .catch((err) => {
+              handleError(err)
+              reject(err)
+            })
+        })
+      },
+
       getNextNumber(params, setState = false) {
         return new Promise((resolve, reject) => {
           const key = params?.key || 'invoice'

@@ -115,7 +115,18 @@ class InvoicesRequest extends FormRequest
         $exchange_rate = $company_currency != $current_currency ? $this->exchange_rate : 1;
         $currency = Customer::find($this->customer_id)->currency_id;
 
-        return collect($this->except('items', 'taxes'))
+        $fiscalFields = [
+            'fiscal_status',
+            'fiscal_issued_at',
+            'fiscal_locked_at',
+            'verifactu_record_id',
+            'invoice_kind',
+            'original_invoice_id',
+            'rectification_type',
+            'rectification_reason',
+        ];
+
+        return collect($this->except(array_merge(['items', 'taxes'], $fiscalFields)))
             ->merge([
                 'creator_id' => $this->user()->id ?? null,
                 'status' => $this->has('invoiceSend') ? Invoice::STATUS_SENT : Invoice::STATUS_DRAFT,

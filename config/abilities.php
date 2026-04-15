@@ -8,6 +8,7 @@ use Crater\Models\Expense;
 use Crater\Models\Invoice;
 use Crater\Models\Item;
 use Crater\Models\Note;
+use Crater\Models\VerifactuRecord;
 use Crater\Models\Payment;
 use Crater\Models\RecurringInvoice;
 use Crater\Models\TaxType;
@@ -415,6 +416,24 @@ return [
             "depends_on" => [
                 'view-all-notes'
             ]
-        ]
+        ],
+
+        // VERI*FACTU
+        [
+            "name" => "view verifactu",
+            "ability" => "view-verifactu",
+            "model" => VerifactuRecord::class,
+            "depends_on" => [
+                'view-invoice',
+            ],
+        ],
+        [
+            "name" => "manage verifactu",
+            "ability" => "manage-verifactu",
+            "model" => VerifactuRecord::class,
+            "depends_on" => [
+                'view-verifactu',
+            ],
+        ],
     ]
 ];

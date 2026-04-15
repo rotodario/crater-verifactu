@@ -27,6 +27,7 @@ const router = useRouter()
 
 const isMarkAsSent = ref(false)
 const isLoading = ref(false)
+const isIssuing = ref(false)
 
 const invoiceList = ref(null)
 const currentPageNumber = ref(1)
@@ -65,6 +66,14 @@ const canCreateRectificative = computed(() => {
     userStore.hasAbilities(abilities.CREATE_INVOICE) &&
     invoiceStore.isFiscallyLocked(invoiceData.value) &&
     invoiceData.value.invoice_kind !== 'RECTIFICATIVE'
+  )
+})
+
+const canIssueFiscally = computed(() => {
+  return (
+    invoiceData.value &&
+    userStore.hasAbilities(abilities.MANAGE_VERIFACTU) &&
+    invoiceData.value.fiscal_status === 'NOT_ISSUED'
   )
 })
 function getFiscalBadgeColor(status) {
@@ -131,6 +140,30 @@ async function onSendInvoice() {
     id: invoiceData.value.id,
     data: invoiceData.value,
   })
+}
+
+async function onIssueFiscally() {
+  dialogStore
+    .openDialog({
+      title: t('general.are_you_sure'),
+      message: 'Se expedirá fiscalmente esta factura y quedará bloqueada para edición. Esta acción no se puede deshacer.',
+      yesLabel: t('general.ok'),
+      noLabel: t('general.cancel'),
+      variant: 'primary',
+      hideNoButton: false,
+      size: 'lg',
+    })
+    .then(async (response) => {
+      if (response) {
+        isIssuing.value = true
+        try {
+          const result = await invoiceStore.issueFiscally({ id: invoiceData.value.id })
+          invoiceData.value = { ...invoiceData.value, ...result.data.data }
+        } finally {
+          isIssuing.value = false
+        }
+      }
+    })
 }
 
 async function onCreateRectificative() {
@@ -307,6 +340,16 @@ onSearched = debounce(onSearched, 500)
           @click="onSendInvoice"
         >
           {{ $t('invoices.send_invoice') }}
+        </BaseButton>
+
+        <BaseButton
+          v-if="canIssueFiscally"
+          variant="primary-outline"
+          class="ml-3 text-sm"
+          :disabled="isIssuing"
+          @click="onIssueFiscally"
+        >
+          {{ isIssuing ? 'Expidiendo...' : 'Expedir fiscalmente' }}
         </BaseButton>
 
         <div v-if="invoiceData" class="ml-3 flex items-center gap-2">

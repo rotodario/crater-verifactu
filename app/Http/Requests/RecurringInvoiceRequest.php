@@ -105,7 +105,18 @@ class RecurringInvoiceRequest extends FormRequest
 
         $nextInvoiceAt = RecurringInvoice::getNextInvoiceDate($this->frequency, $this->starts_at);
 
-        return collect($this->except('items', 'taxes'))
+        $fiscalFields = [
+            'fiscal_status',
+            'fiscal_issued_at',
+            'fiscal_locked_at',
+            'verifactu_record_id',
+            'invoice_kind',
+            'original_invoice_id',
+            'rectification_type',
+            'rectification_reason',
+        ];
+
+        return collect($this->except(array_merge(['items', 'taxes'], $fiscalFields)))
             ->merge([
                 'creator_id' => $this->user()->id,
                 'company_id' => $this->header('company'),
