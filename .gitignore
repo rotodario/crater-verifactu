@@ -32,3 +32,6 @@ curl-debug.log
 crater.code-workspace
 _ide_helper.php
 test.txt
+/storage/certs/
+
+.claude/

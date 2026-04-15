@@ -1,62 +1,83 @@
 # VERI*FACTU Roadmap
 
-Fecha de corte: 2026-04-15.
+Fecha de actualizacion: 2026-04-15.
+
+## Estado real actual
+
+Ya existe un baseline funcional sobre esta copia restaurada de Crater con:
+
+- capa fiscal desacoplada del estado comercial
+- records, submissions, events, declarations e installations
+- bloqueo fiscal de facturas expedidas
+- rectificativas base no destructivas
+- numeracion separada para rectificativas
+- dashboard VERI*FACTU visible en admin
+- vistas de Records, Submissions, Events y Setup
+- retry manual de submissions FAILED desde UI
+- base de integracion AEAT por drivers, XML, huella y parser
+- repositorio git inicializado y baseline publicado en GitHub
 
 ## Fase 0. Base ya realizada
 
-- Auditor?a de la instalaci?n real restaurada.
-- Identificaci?n del flujo de facturaci?n, PDF, estados y riesgos.
+- Auditoria de la instalacion real restaurada.
+- Identificacion del flujo de facturacion, PDF, estados y riesgos.
 - Capa fiscal separada del `status` comercial.
 - Migraciones y modelos `verifactu_*`.
-- Emisi?n fiscal interna y bloqueo de edici?n/borrado.
+- Emision fiscal interna y bloqueo de edicion/borrado.
 - Pipeline `stub` con submissions, eventos, jobs y scheduler.
-- Rectificativas base y numeraci?n espec?fica.
+- Rectificativas base y numeracion especifica.
 - Dashboard VERI*FACTU visible en admin.
+- Setup visible con installation/declarations.
+- Commit baseline del fork y push a `origin/main`.
 
-## Fase 1. Consolidaci?n inmediata
+## Fase 1. Consolidacion inmediata
 
-- A?adir detalle de registro VERI*FACTU desde dashboard.
-- A?adir detalle de submission con payload/respuesta resumida.
-- A?adir filtros por estado, rango y tipo de factura.
-- A?adir reproceso controlado de submissions fallidas.
-- Revisar permisos por rol sobre acciones fiscales.
+- Revisar los cambios pendientes sin commit introducidos despues del baseline (`tax_number`, abilities VERI*FACTU, AEAT/XML, validators, issue button en UI).
+- Normalizar textos y documentacion para que no quede contexto repartido entre chat y codigo.
+- Decidir si la capa AEAT nueva se considera experimental o ya forma parte del baseline funcional.
+- Revisar permisos por rol sobre acciones fiscales (`view-verifactu`, `manage-verifactu`).
 - Congelar mejor campos fiscales sensibles en UI y API.
+- Validar con datos reales locales que `tax_number` se propaga correctamente a snapshot, XML y vistas.
 
-## Fase 2. Preparaci?n seria para AEAT
+## Fase 2. Preparacion seria para AEAT
 
-- Definir modos operativos expl?citos: `off`, `shadow`, `stub`, `aeat_sandbox`, `aeat_production`.
-- Implementar cliente AEAT aislado por driver.
-- Dise?ar almacenamiento seguro de certificados y metadatos.
-- Registrar request/response con trazabilidad suficiente y sanitizaci?n.
-- Preparar validaciones previas al env?o.
-- Definir estrategia de retry persistente y alertas.
+- Validar y endurecer modos operativos: `off`, `shadow`, `stub`, `aeat_sandbox`, `aeat_production`.
+- Confirmar estrategia definitiva del `DriverManager`.
+- Probar `AeatHttpClient` con certificados reales en sandbox controlado.
+- Validar `VerifactuXmlBuilder` contra ejemplos y respuestas reales de AEAT.
+- Validar `AeatResponseParser` con respuestas correctas y de error.
+- Registrar request/response con trazabilidad suficiente y sanitizacion.
+- Cerrar almacenamiento seguro de certificados y metadatos.
+- Preparar alertas y reintentos persistentes mas duros si el envio sale de `stub`.
 
 ## Fase 3. Rectificativas avanzadas
 
 - Modelo por diferencias.
-- Gesti?n de importes negativos donde sea compatible.
-- Reglas completas de negocio por motivo de rectificaci?n.
-- Serie/contador fiscal robusto por tipo de rectificativa.
-- Encadenamiento fiscal espec?fico si aplica.
+- Gestion de importes negativos donde sea compatible.
+- Reglas completas de negocio por motivo de rectificacion.
+- Mapeo completo `rectification_type -> tipo_factura R1-R5`.
+- Serie y contador fiscal robusto por tipo de rectificativa.
+- Encadenamiento fiscal especifico si aplica.
 
-## Fase 4. Operaci?n y cumplimiento
+## Fase 4. Operacion y cumplimiento
 
-- Declaraci?n responsable operativa por versi?n.
+- Declaracion responsable operativa por version.
 - Checklist de despliegue.
 - Manual interno de soporte.
-- Plan de reversi?n local y de restauraci?n.
-- Pol?tica de backups y trazabilidad.
+- Plan de restauracion y rollback local.
+- Politica de backups y trazabilidad.
+- Checklist previa a activar `aeat_production`.
 
 ## Riesgos abiertos
 
 - Esta copia local ya contiene datos de prueba VERI*FACTU.
-- No existe todav?a integraci?n AEAT real ni sandbox oficial.
-- La numeraci?n global de Crater sigue siendo un punto sensible y debe vigilarse.
-- Hay rutas de debug hist?ricas en el proyecto que conviene retirar antes de endurecer el entorno.
+- Hay cambios nuevos sin commit posteriores al baseline `ad81b53`.
+- La base AEAT/XML existe, pero no esta cerrada como integracion final homologada.
+- La numeracion global de Crater sigue siendo un punto sensible.
+- Hay ficheros historicos de debug/utilidad en la restauracion que conviene decidir si permanecen en el fork publico.
 
-## Antes de crear git y empezar commits/push
+## Siguiente paso recomendado
 
-1. Confirmar qu? archivos locales de debug se quieren conservar o excluir.
-2. Verificar `.env` y credenciales para no versionar secretos.
-3. Revisar la base local y decidir si se parte de snapshot actual o de una copia m?s limpia.
-4. Hacer primer commit de baseline del fork con documentaci?n incluida.
+1. Hacer un commit separado de documentacion y saneo de contexto.
+2. Revisar funcionalmente el bloque nuevo sin commit (AEAT/XML, NIF, abilities, issue manual).
+3. Agrupar esos cambios en uno o varios commits limpios antes de seguir implementando sobre `main`.
