@@ -14,6 +14,8 @@ class VerifactuService
     protected $eventLogger;
     protected $submissionService;
     protected $declarationService;
+    protected $driverManager;
+    protected $validator;
 
     public function __construct(
         VerifactuInstallationResolver $resolver,
@@ -22,7 +24,9 @@ class VerifactuService
         VerifactuQrService $qrService,
         VerifactuEventLogger $eventLogger,
         VerifactuSubmissionService $submissionService,
-        VerifactuDeclarationService $declarationService
+        VerifactuDeclarationService $declarationService,
+        VerifactuDriverManager $driverManager,
+        VerifactuPreSubmissionValidator $validator
     ) {
         $this->resolver = $resolver;
         $this->recordBuilder = $recordBuilder;
@@ -31,11 +35,13 @@ class VerifactuService
         $this->eventLogger = $eventLogger;
         $this->submissionService = $submissionService;
         $this->declarationService = $declarationService;
+        $this->driverManager = $driverManager;
+        $this->validator = $validator;
     }
 
     public function ensureIssued(Invoice $invoice, array $context = [])
     {
-        if (! config('verifactu.enabled', true)) {
+        if ($this->driverManager->isOff()) {
             return null;
         }
 
@@ -44,6 +50,23 @@ class VerifactuService
         }
 
         $installation = $this->resolver->resolveForCompany($invoice->company_id);
+
+        $validation = $this->validator->validate($invoice, $installation);
+
+        if (! $validation['valid']) {
+            $this->eventLogger->log(
+                'validation_failed',
+                $invoice,
+                null,
+                ['errors' => $validation['errors']],
+                'Invoice failed VERI*FACTU pre-submission validation.'
+            );
+
+            throw new \RuntimeException(
+                'VERI*FACTU validation failed: ' . implode(' | ', $validation['errors'])
+            );
+        }
+
         $this->declarationService->ensureDraftDeclaration($invoice->company_id);
 
         $recordAttributes = $this->recordBuilder->build($invoice, $installation);
@@ -58,7 +81,7 @@ class VerifactuService
         $record->save();
 
         $this->stateManager->markIssued($invoice, $record->id);
-        $this->submissionService->queueStubSubmission($record);
+        $this->submissionService->queueSubmission($record);
 
         $this->eventLogger->log(
             'invoice_issued',

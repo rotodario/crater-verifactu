@@ -3,7 +3,7 @@
 namespace Crater\Http\Controllers\V1\Admin\Verifactu;
 
 use Crater\Http\Controllers\Controller;
-use Crater\Models\Invoice;
+use Crater\Models\VerifactuRecord;
 use Crater\Models\VerifactuSubmission;
 use Illuminate\Http\Request;
 
@@ -11,7 +11,7 @@ class ListSubmissionsController extends Controller
 {
     public function __invoke(Request $request)
     {
-        $this->authorize('viewAny', Invoice::class);
+        $this->authorize('viewAny', VerifactuRecord::class);
 
         $companyId = $request->header('company');
         $limit = min(max((int) $request->get('limit', 50), 1), 200);

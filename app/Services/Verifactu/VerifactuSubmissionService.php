@@ -4,29 +4,28 @@ namespace Crater\Services\Verifactu;
 
 use Carbon\Carbon;
 use Crater\Jobs\ProcessVerifactuSubmissionJob;
-use Crater\Models\Invoice;
 use Crater\Models\VerifactuRecord;
 use Crater\Models\VerifactuSubmission;
 
 class VerifactuSubmissionService
 {
-    protected $eventLogger;
+    public function __construct(
+        protected VerifactuDriverManager $driverManager,
+        protected VerifactuEventLogger $eventLogger
+    ) {}
 
-    public function __construct(VerifactuEventLogger $eventLogger)
+    public function queueSubmission(VerifactuRecord $record): ?VerifactuSubmission
     {
-        $this->eventLogger = $eventLogger;
-    }
-
-    public function queueStubSubmission(VerifactuRecord $record)
-    {
-        if (! config('verifactu.submission_enabled', false)) {
+        if (! $this->driverManager->shouldSubmit()) {
             return null;
         }
+
+        $driver = $this->driverManager->forCurrentMode();
 
         $submission = VerifactuSubmission::create([
             'verifactu_record_id' => $record->id,
             'company_id' => $record->company_id,
-            'driver' => config('verifactu.submission_driver', 'stub'),
+            'driver' => $driver->getName(),
             'status' => 'PENDING',
             'attempt' => 1,
             'request_payload' => [
@@ -41,7 +40,7 @@ class VerifactuSubmissionService
         return $submission;
     }
 
-    public function retrySubmission(VerifactuSubmission $submission)
+    public function retrySubmission(VerifactuSubmission $submission): VerifactuSubmission
     {
         if ($submission->status !== 'FAILED') {
             return $submission;
@@ -61,7 +60,7 @@ class VerifactuSubmissionService
         return $submission->fresh();
     }
 
-    public function processSubmission(VerifactuSubmission $submission)
+    public function processSubmission(VerifactuSubmission $submission): VerifactuSubmission
     {
         if (! in_array($submission->status, ['PENDING', 'FAILED'])) {
             return $submission;
@@ -70,11 +69,9 @@ class VerifactuSubmissionService
         $submission->status = 'PROCESSING';
         $submission->submitted_at = Carbon::now();
         $submission->save();
-
         $submission->refresh();
-        $record = $submission->record;
 
-        if (! $record) {
+        if (! $submission->record) {
             $submission->status = 'FAILED';
             $submission->error_message = 'VERI*FACTU record not found.';
             $submission->completed_at = Carbon::now();
@@ -83,55 +80,16 @@ class VerifactuSubmissionService
             return $submission;
         }
 
-        if ($submission->driver === 'stub') {
-            return $this->processStubSubmission($submission, $record);
+        try {
+            $this->driverManager->forDriver($submission->driver)->submit($submission);
+        } catch (\Throwable $e) {
+            $submission->refresh();
+            $submission->status = 'FAILED';
+            $submission->error_message = $e->getMessage();
+            $submission->completed_at = Carbon::now();
+            $submission->save();
         }
 
-        $submission->status = 'FAILED';
-        $submission->error_message = 'Unsupported VERI*FACTU submission driver.';
-        $submission->completed_at = Carbon::now();
-        $submission->save();
-
-        return $submission;
-    }
-
-    protected function processStubSubmission(VerifactuSubmission $submission, VerifactuRecord $record)
-    {
-        $externalReference = 'stub-' . $submission->id . '-' . Carbon::now()->format('YmdHis');
-
-        $submission->status = 'ACCEPTED';
-        $submission->external_reference = $externalReference;
-        $submission->response_payload = [
-            'driver' => 'stub',
-            'status' => 'accepted',
-            'external_reference' => $externalReference,
-            'accepted_at' => Carbon::now()->toIso8601String(),
-        ];
-        $submission->completed_at = Carbon::now();
-        $submission->save();
-
-        $record->status = 'ACCEPTED';
-        $record->metadata = array_merge($record->metadata ?? [], [
-            'last_submission_id' => $submission->id,
-            'last_external_reference' => $externalReference,
-        ]);
-        $record->save();
-
-        $invoice = Invoice::find($record->invoice_id);
-
-        if ($invoice) {
-            $invoice->fiscal_status = Invoice::FISCAL_STATUS_ACCEPTED;
-            $invoice->save();
-
-            $this->eventLogger->log(
-                'submission_accepted',
-                $invoice,
-                $record,
-                ['submission_id' => $submission->id, 'driver' => 'stub'],
-                'VERI*FACTU submission accepted by stub driver.'
-            );
-        }
-
-        return $submission;
+        return $submission->fresh();
     }
 }

@@ -103,22 +103,31 @@ class VerifactuRecordBuilder
             $issuedAt->format('YmdHis'),
         ]);
 
-        $hashPayload = json_encode([
-            'invoice_uid' => $invoiceUid,
-            'invoice_number' => $invoice->invoice_number,
-            'invoice_date' => optional($invoice->invoice_date)->format('Y-m-d'),
-            'total' => $invoice->total,
-            'previous_hash' => optional($previousRecord)->hash,
-            'snapshot' => $snapshot,
+        $tipoFactura = VerifactuHuellaComputer::tipoFactura([
+            'invoice_kind' => $invoice->invoice_kind ?? null,
         ]);
+
+        $huella = (new VerifactuHuellaComputer())->compute(
+            issuerNif:       optional($invoice->company)->tax_number ?? '',
+            invoiceNumber:   $invoice->invoice_number,
+            invoiceDate:     VerifactuHuellaComputer::formatInvoiceDate(
+                                 $invoice->invoice_date ?? $issuedAt
+                             ),
+            tipoFactura:     $tipoFactura,
+            cuotaTotal:      VerifactuHuellaComputer::formatAmount((int) $invoice->tax),
+            importeTotal:    VerifactuHuellaComputer::formatAmount((int) $invoice->total),
+            previousHuella:  optional($previousRecord)->hash,
+            fechaHoraHuso:   VerifactuHuellaComputer::formatTimestamp($issuedAt),
+        );
 
         return [
             'record_type' => 'invoice_registration',
-            'status' => 'ISSUED_INTERNAL',
+            'status' => 'ISSUED',
             'invoice_number' => $invoice->invoice_number,
             'invoice_date' => optional($invoice->invoice_date)->format('Y-m-d'),
             'invoice_uid' => $invoiceUid,
-            'hash' => hash('sha256', $hashPayload),
+            'tipo_factura' => $tipoFactura,
+            'hash' => $huella,
             'previous_hash' => optional($previousRecord)->hash,
             'issued_at' => $issuedAt,
             'locked_at' => $issuedAt,

@@ -3,7 +3,6 @@
 namespace Crater\Http\Controllers\V1\Admin\Verifactu;
 
 use Crater\Http\Controllers\Controller;
-use Crater\Models\Invoice;
 use Crater\Models\VerifactuRecord;
 use Illuminate\Http\Request;
 
@@ -11,7 +10,7 @@ class ShowRecordController extends Controller
 {
     public function __invoke(Request $request, VerifactuRecord $record)
     {
-        $this->authorize('viewAny', Invoice::class);
+        $this->authorize('viewAny', VerifactuRecord::class);
 
         $companyId = $request->header('company');
 

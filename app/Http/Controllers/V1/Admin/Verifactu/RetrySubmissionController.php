@@ -3,7 +3,7 @@
 namespace Crater\Http\Controllers\V1\Admin\Verifactu;
 
 use Crater\Http\Controllers\Controller;
-use Crater\Models\Invoice;
+use Crater\Models\VerifactuRecord;
 use Crater\Models\VerifactuSubmission;
 use Crater\Services\Verifactu\VerifactuSubmissionService;
 use Illuminate\Http\Request;
@@ -12,7 +12,7 @@ class RetrySubmissionController extends Controller
 {
     public function __invoke(Request $request, VerifactuSubmission $submission, VerifactuSubmissionService $service)
     {
-        $this->authorize('viewAny', Invoice::class);
+        $this->authorize('manage', VerifactuRecord::class);
 
         $companyId = $request->header('company');
 

@@ -12,10 +12,10 @@ class VerifactuSubmission extends Model
     protected $guarded = ['id'];
 
     protected $casts = [
-        'request_payload' => 'array',
+        'request_payload'  => 'array',
         'response_payload' => 'array',
-        'submitted_at' => 'datetime',
-        'completed_at' => 'datetime',
+        'submitted_at'     => 'datetime',
+        'completed_at'     => 'datetime',
     ];
 
     public function record()

@@ -14,7 +14,7 @@ class CreateVerifactuRecordsTable extends Migration
             $table->unsignedInteger('invoice_id');
             $table->unsignedBigInteger('verifactu_installation_id')->nullable();
             $table->string('record_type')->default('invoice_registration');
-            $table->string('status')->default('ISSUED_INTERNAL');
+            $table->string('status')->default('ISSUED');
             $table->string('invoice_number');
             $table->date('invoice_date');
             $table->string('invoice_uid');

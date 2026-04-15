@@ -145,6 +145,8 @@ trait GeneratesPdfTrait
             '{CONTACT_EMAIL}' => $customer->email,
             '{CONTACT_PHONE}' => $customer->phone,
             '{CONTACT_WEBSITE}' => $customer->website,
+            '{CUSTOMER_TAX_NUMBER}' => $customer->tax_number,
+            '{COMPANY_TAX_NUMBER}' => $this->company->tax_number,
         ];
 
         $customFields = $this->fields;
