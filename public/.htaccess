@@ -1,0 +1,16 @@
+<IfModule mod_rewrite.c>
+    Options -Indexes
+    RewriteEngine On
+    RewriteBase /
+
+    # 1) Si existe archivo/carpeta, servirlo directamente
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # 2) El resto al front controller
+    RewriteRule ^ index.php [L]
+</IfModule>
+<IfModule !mod_rewrite.c>
+    FallbackResource /index.php
+</IfModule>
