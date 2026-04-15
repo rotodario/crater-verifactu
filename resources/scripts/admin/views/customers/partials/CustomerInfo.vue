@@ -37,6 +37,11 @@
 
       <BaseDescriptionListItem
         :content-loading="contentLoading"
+        label="NIF / CIF"
+        :value="selectedViewCustomer?.tax_number"
+      />
+      <BaseDescriptionListItem
+        :content-loading="contentLoading"
         :label="$t('customers.phone_number')"
         :value="selectedViewCustomer?.phone"
       />

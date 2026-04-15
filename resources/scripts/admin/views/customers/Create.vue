@@ -87,6 +87,18 @@
             </BaseInputGroup>
 
             <BaseInputGroup
+              label="NIF / CIF"
+              :content-loading="isFetchingInitialData"
+            >
+              <BaseInput
+                v-model.trim="customerStore.currentCustomer.tax_number"
+                :content-loading="isFetchingInitialData"
+                type="text"
+                placeholder="12345678A"
+              />
+            </BaseInputGroup>
+
+            <BaseInputGroup
               :label="$t('customers.phone')"
               :content-loading="isFetchingInitialData"
             >

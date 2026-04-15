@@ -28,6 +28,10 @@
           />
         </BaseInputGroup>
 
+        <BaseInputGroup label="NIF / CIF">
+          <BaseInput v-model="companyForm.tax_number" placeholder="B12345678" />
+        </BaseInputGroup>
+
         <BaseInputGroup :label="$tc('settings.company_info.phone')">
           <BaseInput v-model="companyForm.address.phone" />
         </BaseInputGroup>
@@ -160,6 +164,7 @@ let isSaving = ref(false)
 
 const companyForm = reactive({
   name: null,
+  tax_number: null,
   logo: null,
   address: {
     address_street_1: '',

@@ -180,6 +180,7 @@ async function getFields() {
           { label: 'Email', value: 'CONTACT_EMAIL' },
           { label: 'Phone', value: 'CONTACT_PHONE' },
           { label: 'Website', value: 'CONTACT_WEBSITE' },
+          { label: 'NIF / CIF', value: 'CUSTOMER_TAX_NUMBER' },
           ...customerFields.value.map((i) => ({
             label: i.label,
             value: i.slug,
@@ -241,6 +242,7 @@ async function getFields() {
         label: 'Company',
         fields: [
           { label: 'Company Name', value: 'COMPANY_NAME' },
+          { label: 'NIF / CIF', value: 'COMPANY_TAX_NUMBER' },
           { label: 'Country', value: 'COMPANY_COUNTRY' },
           { label: 'State', value: 'COMPANY_STATE' },
           { label: 'City', value: 'COMPANY_CITY' },

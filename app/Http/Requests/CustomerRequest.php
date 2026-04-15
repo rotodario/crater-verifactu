@@ -44,6 +44,11 @@ class CustomerRequest extends FormRequest
             'company_name' => [
                 'nullable',
             ],
+            'tax_number' => [
+                'nullable',
+                'string',
+                'max:20',
+            ],
             'contact_name' => [
                 'nullable',
             ],
@@ -138,6 +143,7 @@ class CustomerRequest extends FormRequest
                 'phone',
                 'prefix',
                 'company_name',
+                'tax_number',
                 'contact_name',
                 'website',
                 'enable_portal',

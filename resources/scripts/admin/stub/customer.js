@@ -4,6 +4,7 @@ export default function () {
   return {
     name: '',
     contact_name: '',
+    tax_number: null,
     email: '',
     phone: null,
     password: '',
