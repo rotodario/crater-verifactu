@@ -3,6 +3,7 @@
 namespace Crater\Services\Verifactu\Drivers;
 
 use Carbon\Carbon;
+use Crater\Models\VerifactuInstallation;
 use Crater\Models\VerifactuSubmission;
 use Crater\Services\Verifactu\AeatHttpClient;
 use Crater\Services\Verifactu\AeatResponseParser;
@@ -18,11 +19,6 @@ use RuntimeException;
  *
  * ⚠️  Records submitted here have full legal effect before AEAT.
  *     The hash chain is immutable once accepted.
- *
- * Requirements:
- *   - VERIFACTU_AEAT_PRODUCTION_URL — endpoint URL (env)
- *   - VERIFACTU_CERT_PATH           — path to .p12 or .pem certificate
- *   - VERIFACTU_CERT_PASSWORD       — certificate password
  */
 class AeatProductionDriver implements VerifactuDriverInterface
 {
@@ -33,14 +29,13 @@ class AeatProductionDriver implements VerifactuDriverInterface
 
     public function submit(VerifactuSubmission $submission): void
     {
-        $this->ensureConfig();
-
         $record = $submission->record;
         if (! $record) {
             throw new RuntimeException('VerifactuRecord not found for submission #' . $submission->id);
         }
 
         $record->loadMissing(['installation']);
+        $this->ensureConfig($record->installation);
 
         // 1. Build SOAP XML
         $xmlBuilder = new VerifactuXmlBuilder();
@@ -51,11 +46,19 @@ class AeatProductionDriver implements VerifactuDriverInterface
         $submission->save();
 
         // 3. Send to AEAT production
-        $httpClient = new AeatHttpClient(
-            endpointUrl:  config('verifactu.aeat.production_url'),
-            certPath:     config('verifactu.aeat.certificate_path'),
-            certPassword: config('verifactu.aeat.certificate_password', ''),
-        );
+        $installation = $record->installation;
+        $httpClient   = $installation && $installation->hasCertificate()
+            ? new AeatHttpClient(
+                endpointUrl:  config('verifactu.aeat.production_url'),
+                certPassword: $installation->getCertPassword(),
+                certData:     $installation->getCertBytes(),
+                certType:     $installation->cert_type ?? 'p12',
+            )
+            : new AeatHttpClient(
+                endpointUrl:  config('verifactu.aeat.production_url'),
+                certPath:     config('verifactu.aeat.certificate_path'),
+                certPassword: config('verifactu.aeat.certificate_password', ''),
+            );
 
         $responseXml = $httpClient->send($requestXml);
 
@@ -84,13 +87,17 @@ class AeatProductionDriver implements VerifactuDriverInterface
         }
     }
 
-    private function ensureConfig(): void
+    private function ensureConfig(?VerifactuInstallation $installation = null): void
     {
         if (! config('verifactu.aeat.production_url')) {
             throw new RuntimeException('VERIFACTU_AEAT_PRODUCTION_URL is not configured.');
         }
-        if (! config('verifactu.aeat.certificate_path')) {
-            throw new RuntimeException('VERIFACTU_CERT_PATH is not configured.');
+
+        $hasCert = ($installation && $installation->hasCertificate())
+            || config('verifactu.aeat.certificate_path');
+
+        if (! $hasCert) {
+            throw new RuntimeException('No certificate configured. Upload one in VERI*FACTU Setup.');
         }
     }
 }

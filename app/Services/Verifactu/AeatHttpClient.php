@@ -18,9 +18,11 @@ class AeatHttpClient
 {
     public function __construct(
         protected string  $endpointUrl,
-        protected string  $certPath,
+        protected ?string $certPath = null,
         protected string  $certPassword = '',
-        protected int     $timeoutSeconds = 30
+        protected int     $timeoutSeconds = 30,
+        protected ?string $certData = null,   // raw bytes from DB (alternative to certPath)
+        protected ?string $certType = null,   // 'p12' or 'pem' (required when certData set)
     ) {}
 
     /**
@@ -84,14 +86,19 @@ class AeatHttpClient
      */
     private function prepareCert(): array
     {
-        if (! file_exists($this->certPath)) {
+        // Priority: certData (from DB) over certPath (from filesystem)
+        if ($this->certData !== null) {
+            return $this->prepareCertFromData($this->certData, $this->certType ?? 'p12');
+        }
+
+        if (! $this->certPath || ! file_exists($this->certPath)) {
             throw new RuntimeException("Certificate file not found: {$this->certPath}");
         }
 
         $ext = strtolower(pathinfo($this->certPath, PATHINFO_EXTENSION));
 
         if (in_array($ext, ['p12', 'pfx'])) {
-            return $this->extractPkcs12();
+            return $this->extractPkcs12(file_get_contents($this->certPath));
         }
 
         // PEM — cert and key in the same file; pass certPassword for encrypted keys
@@ -104,15 +111,35 @@ class AeatHttpClient
     }
 
     /**
-     * Read a PKCS12 file and write separate temp PEM files for cert and key.
+     * Prepare cert from raw bytes (stored in DB). Writes a temp file if PEM,
+     * or extracts directly from bytes if PKCS12.
+     */
+    private function prepareCertFromData(string $bytes, string $type): array
+    {
+        if (in_array($type, ['p12', 'pfx'])) {
+            return $this->extractPkcs12($bytes);
+        }
+
+        // PEM: write bytes to a temp file
+        $tmpFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'verifactu_' . uniqid() . '_cert.pem';
+        file_put_contents($tmpFile, $bytes);
+
+        return [
+            $tmpFile,
+            $tmpFile,
+            $this->certPassword ?: null,
+            fn() => @unlink($tmpFile),
+        ];
+    }
+
+    /**
+     * Extract cert + key from PKCS12 bytes and write separate temp PEM files.
      * The extracted private key is unencrypted PEM — no password needed.
      *
      * @return array{0: string, 1: string, 2: null, 3: callable}
      */
-    private function extractPkcs12(): array
+    private function extractPkcs12(string $pkcs12): array
     {
-        $pkcs12 = file_get_contents($this->certPath);
-
         $certs = [];
         if (! openssl_pkcs12_read($pkcs12, $certs, $this->certPassword)) {
             throw new RuntimeException(

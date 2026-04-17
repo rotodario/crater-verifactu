@@ -12,10 +12,27 @@ class VerifactuInstallation extends Model
     protected $guarded = ['id'];
 
     protected $casts = [
-        'enabled' => 'boolean',
+        'enabled'            => 'boolean',
         'submission_enabled' => 'boolean',
-        'settings' => 'array',
+        'settings'           => 'array',
+        'cert_data'          => 'encrypted',
+        'cert_password'      => 'encrypted',
     ];
+
+    public function hasCertificate(): bool
+    {
+        return ! empty($this->cert_data);
+    }
+
+    public function getCertBytes(): ?string
+    {
+        return $this->cert_data ?: null;
+    }
+
+    public function getCertPassword(): string
+    {
+        return $this->cert_password ?? '';
+    }
 
     public function company()
     {

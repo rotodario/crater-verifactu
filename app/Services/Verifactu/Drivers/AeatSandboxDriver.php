@@ -31,14 +31,13 @@ class AeatSandboxDriver implements VerifactuDriverInterface
 
     public function submit(VerifactuSubmission $submission): void
     {
-        $this->ensureConfig();
-
         $record = $submission->record;
         if (! $record) {
             throw new RuntimeException('VerifactuRecord not found for submission #' . $submission->id);
         }
 
         $record->loadMissing(['installation']);
+        $this->ensureConfig($record->installation);
 
         // 1. Build SOAP XML
         $xmlBuilder = new VerifactuXmlBuilder();
@@ -49,11 +48,19 @@ class AeatSandboxDriver implements VerifactuDriverInterface
         $submission->save();
 
         // 3. Send to AEAT sandbox
-        $httpClient = new AeatHttpClient(
-            endpointUrl:   config('verifactu.aeat.sandbox_url'),
-            certPath:      config('verifactu.aeat.certificate_path'),
-            certPassword:  config('verifactu.aeat.certificate_password', ''),
-        );
+        $installation = $record->installation;
+        $httpClient   = $installation && $installation->hasCertificate()
+            ? new AeatHttpClient(
+                endpointUrl:  config('verifactu.aeat.sandbox_url'),
+                certPassword: $installation->getCertPassword(),
+                certData:     $installation->getCertBytes(),
+                certType:     $installation->cert_type ?? 'p12',
+            )
+            : new AeatHttpClient(
+                endpointUrl:  config('verifactu.aeat.sandbox_url'),
+                certPath:     config('verifactu.aeat.certificate_path'),
+                certPassword: config('verifactu.aeat.certificate_password', ''),
+            );
 
         $responseXml = $httpClient->send($requestXml);
 
@@ -82,13 +89,17 @@ class AeatSandboxDriver implements VerifactuDriverInterface
         }
     }
 
-    private function ensureConfig(): void
+    private function ensureConfig(?\Crater\Models\VerifactuInstallation $installation = null): void
     {
         if (! config('verifactu.aeat.sandbox_url')) {
             throw new RuntimeException('VERIFACTU_AEAT_SANDBOX_URL is not configured.');
         }
-        if (! config('verifactu.aeat.certificate_path')) {
-            throw new RuntimeException('VERIFACTU_CERT_PATH is not configured.');
+
+        $hasCert = ($installation && $installation->hasCertificate())
+            || config('verifactu.aeat.certificate_path');
+
+        if (! $hasCert) {
+            throw new RuntimeException('No certificate configured. Upload one in VERI*FACTU Setup.');
         }
     }
 }
