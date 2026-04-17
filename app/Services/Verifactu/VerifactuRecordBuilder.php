@@ -90,10 +90,12 @@ class VerifactuRecordBuilder
                 ];
             })->values()->toArray(),
             'software' => [
-                'name' => $installation->software_name ?: config('verifactu.software.name'),
-                'version' => $installation->software_version ?: config('verifactu.software.version'),
-                'vendor_name' => config('verifactu.software.vendor_name'),
-                'vendor_tax_id' => config('verifactu.software.vendor_tax_id'),
+                'name'                => $installation->software_name    ?: config('verifactu.software.name'),
+                'version'             => $installation->software_version  ?: config('verifactu.software.version'),
+                'vendor_name'         => $installation->vendor_name       ?: config('verifactu.software.vendor_name'),
+                'vendor_tax_id'       => $installation->vendor_tax_id     ?: config('verifactu.software.vendor_tax_id'),
+                'software_id'         => $installation->software_id       ?: config('verifactu.software.id', 'CRATER-VF-01'),
+                'installation_number' => $installation->installation_number ?: config('verifactu.software.installation_number', '1'),
             ],
         ];
 

@@ -176,11 +176,9 @@ class VerifactuXmlBuilder
         $this->addText($dom, $si, 'sum1:NombreRazon',              self::NS_SUM1, $software['vendor_name'] ?? config('verifactu.software.vendor_name'));
         $this->addText($dom, $si, 'sum1:NIF',                      self::NS_SUM1, $software['vendor_tax_id'] ?? config('verifactu.software.vendor_tax_id'));
         $this->addText($dom, $si, 'sum1:NombreSistemaInformatico', self::NS_SUM1, $software['name']);
-        $this->addText($dom, $si, 'sum1:IdSistemaInformatico',     self::NS_SUM1, config('verifactu.software.id', 'CRATER-VF'));
+        $this->addText($dom, $si, 'sum1:IdSistemaInformatico',     self::NS_SUM1, $software['software_id'] ?? config('verifactu.software.id', 'CRATER-VF-01'));
         $this->addText($dom, $si, 'sum1:Version',                  self::NS_SUM1, $software['version']);
-        $this->addText($dom, $si, 'sum1:NumeroInstalacion',        self::NS_SUM1,
-            optional($installation)->installation_number ?: config('verifactu.software.installation_number', '1')
-        );
+        $this->addText($dom, $si, 'sum1:NumeroInstalacion',        self::NS_SUM1, $software['installation_number'] ?? config('verifactu.software.installation_number', '1'));
         // 01 = producción, 02 = pre-producción (sandbox/stub/dev)
         $mode   = optional($installation)->mode ?: config('verifactu.mode', 'stub');
         $usoCod = ($mode === 'aeat_production') ? '01' : '02';
@@ -352,11 +350,9 @@ class VerifactuXmlBuilder
         $this->addText($dom, $si, 'sum1:NombreRazon',              self::NS_SUM1, $software['vendor_name'] ?? config('verifactu.software.vendor_name'));
         $this->addText($dom, $si, 'sum1:NIF',                      self::NS_SUM1, $software['vendor_tax_id'] ?? config('verifactu.software.vendor_tax_id'));
         $this->addText($dom, $si, 'sum1:NombreSistemaInformatico', self::NS_SUM1, $software['name']);
-        $this->addText($dom, $si, 'sum1:IdSistemaInformatico',     self::NS_SUM1, config('verifactu.software.id', 'CRATER-VF'));
+        $this->addText($dom, $si, 'sum1:IdSistemaInformatico',     self::NS_SUM1, $software['software_id'] ?? config('verifactu.software.id', 'CRATER-VF-01'));
         $this->addText($dom, $si, 'sum1:Version',                  self::NS_SUM1, $software['version']);
-        $this->addText($dom, $si, 'sum1:NumeroInstalacion',        self::NS_SUM1,
-            optional($installation)->installation_number ?: config('verifactu.software.installation_number', '1')
-        );
+        $this->addText($dom, $si, 'sum1:NumeroInstalacion',        self::NS_SUM1, $software['installation_number'] ?? config('verifactu.software.installation_number', '1'));
         $mode   = optional($installation)->mode ?: config('verifactu.mode', 'stub');
         $usoCod = ($mode === 'aeat_production') ? '01' : '02';
         $this->addText($dom, $si, 'sum1:TipoUsoCodSistemaInformatico', self::NS_SUM1, $usoCod);

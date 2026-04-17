@@ -274,6 +274,57 @@
               </div>
             </fieldset>
 
+            <!-- SIF / Software identification -->
+            <fieldset class="border border-gray-200 rounded-lg p-4">
+              <legend class="px-2 text-sm font-medium text-gray-700">Identificación SIF (Sistema de Información Fiscal)</legend>
+              <p class="mt-2 mb-4 text-xs text-gray-500">
+                Estos datos identifican el software ante la AEAT en cada envío. El <strong>IdSistemaInformatico</strong>
+                se obtiene al registrar el software en la AEAT mediante una Declaración Responsable.
+                En modo <span class="font-mono">shadow</span> puedes dejarlo vacío; es obligatorio para sandbox y producción.
+              </p>
+              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <BaseInputGroup label="Nombre del desarrollador (NombreRazon)">
+                  <BaseInput
+                    v-model="configForm.vendor_name"
+                    :disabled="!canManage"
+                    type="text"
+                    placeholder="Empresa Desarrolladora S.L."
+                  />
+                </BaseInputGroup>
+                <BaseInputGroup label="NIF del desarrollador">
+                  <BaseInput
+                    v-model="configForm.vendor_tax_id"
+                    :disabled="!canManage"
+                    type="text"
+                    placeholder="B12345678"
+                    class="font-mono"
+                  />
+                </BaseInputGroup>
+                <BaseInputGroup
+                  label="IdSistemaInformatico (SIF)"
+                  :error="configErrors.software_id"
+                >
+                  <BaseInput
+                    v-model="configForm.software_id"
+                    :disabled="!canManage"
+                    type="text"
+                    placeholder="CRATER-VF-01"
+                    class="font-mono"
+                    :invalid="!!configErrors.software_id"
+                  />
+                </BaseInputGroup>
+                <BaseInputGroup label="NumeroInstalacion">
+                  <BaseInput
+                    v-model="configForm.installation_number"
+                    :disabled="!canManage"
+                    type="text"
+                    placeholder="1"
+                    class="font-mono"
+                  />
+                </BaseInputGroup>
+              </div>
+            </fieldset>
+
             <!-- Software info (readonly) -->
             <fieldset class="border border-gray-100 rounded-lg p-4 bg-gray-50">
               <legend class="px-2 text-sm font-medium text-gray-400">Software (gestionado por el sistema)</legend>
@@ -517,11 +568,17 @@ const configForm = reactive({
   environment: 'local',
   issuer_name: '',
   issuer_tax_id: '',
+  // SIF identification
+  vendor_name: '',
+  vendor_tax_id: '',
+  software_id: '',
+  installation_number: '1',
 })
 
 const configErrors = reactive({
   issuer_name: '',
   issuer_tax_id: '',
+  software_id: '',
 })
 
 const tabs = [
@@ -564,12 +621,18 @@ function syncFormFromInstallation() {
   configForm.environment = installation.value.environment || 'local'
   configForm.issuer_name = installation.value.issuer_name || ''
   configForm.issuer_tax_id = installation.value.issuer_tax_id || ''
+  configForm.vendor_name = installation.value.vendor_name || ''
+  configForm.vendor_tax_id = installation.value.vendor_tax_id || ''
+  configForm.software_id = installation.value.software_id || ''
+  configForm.installation_number = installation.value.installation_number || '1'
 }
 
 function validateConfig() {
   configErrors.issuer_name = ''
   configErrors.issuer_tax_id = ''
+  configErrors.software_id = ''
   let valid = true
+
   if (!configForm.issuer_name.trim()) {
     configErrors.issuer_name = 'El nombre es obligatorio.'
     valid = false
@@ -579,6 +642,11 @@ function validateConfig() {
     valid = false
   } else if (!/^[A-Za-z0-9]{7,15}$/.test(configForm.issuer_tax_id)) {
     configErrors.issuer_tax_id = 'El NIF/CIF debe tener entre 7 y 15 caracteres alfanuméricos.'
+    valid = false
+  }
+  // software_id is required when using AEAT endpoints
+  if (['aeat_sandbox', 'aeat_production'].includes(configForm.mode) && !configForm.software_id.trim()) {
+    configErrors.software_id = 'El IdSistemaInformatico es obligatorio en modo sandbox/producción.'
     valid = false
   }
   return valid
@@ -613,6 +681,10 @@ async function onSaveConfig() {
       environment: configForm.environment,
       issuer_name: configForm.issuer_name.trim(),
       issuer_tax_id: configForm.issuer_tax_id.trim().toUpperCase(),
+      vendor_name: configForm.vendor_name.trim() || null,
+      vendor_tax_id: configForm.vendor_tax_id.trim().toUpperCase() || null,
+      software_id: configForm.software_id.trim() || null,
+      installation_number: configForm.installation_number.trim() || '1',
     })
 
     installation.value = data.installation
@@ -628,6 +700,7 @@ async function onSaveConfig() {
       const errs = error.response.data.errors
       configErrors.issuer_name = errs.issuer_name?.[0] || ''
       configErrors.issuer_tax_id = errs.issuer_tax_id?.[0] || ''
+      configErrors.software_id = errs.software_id?.[0] || ''
     } else {
       handleError(error)
     }
