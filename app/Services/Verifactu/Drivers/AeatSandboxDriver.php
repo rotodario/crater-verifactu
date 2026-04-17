@@ -102,9 +102,7 @@ class AeatSandboxDriver implements VerifactuDriverInterface
             $submission->csv                = $parsed['csv'];
             $submission->external_reference = $parsed['csv'];
             $submission->completed_at       = Carbon::now();
-            if ($hasLineErrors) {
-                $submission->error_message = $parser->summariseErrors($parsed);
-            }
+            $submission->error_message      = $hasLineErrors ? $parser->summariseErrors($parsed) : null;
             $submission->save();
 
             $record->status = 'ACCEPTED';

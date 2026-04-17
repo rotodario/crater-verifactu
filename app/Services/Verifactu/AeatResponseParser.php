@@ -98,7 +98,7 @@ class AeatResponseParser
             // Treat as accepted if the duplicate was AceptadaConErrores or Correcto.
             if ($errorCode === '3000') {
                 $dupNode   = $line->xpath('*[local-name()="RegistroDuplicado"]')[0] ?? null;
-                $dupEstado = $dupNode
+                $dupEstado = ($dupNode !== null)
                     ? (string) ($dupNode->xpath('*[local-name()="EstadoRegistroDuplicado"]')[0] ?? '')
                     : '';
                 if (in_array($dupEstado, ['Correcto', 'AceptadaConErrores', 'AceptadoConErrores'], true)) {

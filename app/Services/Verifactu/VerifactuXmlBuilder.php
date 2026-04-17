@@ -157,7 +157,7 @@ class VerifactuXmlBuilder
         $this->buildEncadenamiento($dom, $encadenamiento, $record, $company);
 
         // SistemaInformatico
-        $this->buildSistemaInformatico($dom, $alta, $software, $installation);
+        $this->buildSistemaInformatico($dom, $alta, $software, $company, $installation);
 
         // FechaHoraHusoGenRegistro / TipoHuella / Huella — after SistemaInformatico
         $this->addText($dom, $alta, 'sum:FechaHoraHusoGenRegistro', self::NS_SUM,
@@ -230,7 +230,7 @@ class VerifactuXmlBuilder
         $this->buildEncadenamiento($dom, $encadenamiento, $record, $company);
 
         // SistemaInformatico
-        $this->buildSistemaInformatico($dom, $anulacion, $software, $installation);
+        $this->buildSistemaInformatico($dom, $anulacion, $software, $company, $installation);
 
         $this->addText($dom, $anulacion, 'sum:FechaHoraHusoGenRegistro', self::NS_SUM,
             VerifactuHuellaComputer::formatTimestamp($issuedAt)
@@ -262,15 +262,23 @@ class VerifactuXmlBuilder
         }
     }
 
-    private function buildSistemaInformatico(DOMDocument $dom, DOMElement $parent, array $software, $installation): void
+    private function buildSistemaInformatico(DOMDocument $dom, DOMElement $parent, array $software, array $company, $installation): void
     {
         $si = $dom->createElementNS(self::NS_SUM, 'sum:SistemaInformatico');
         $parent->appendChild($si);
 
-        $this->addText($dom, $si, 'sum:NombreRazon', self::NS_SUM,
-            $software['vendor_name'] ?? config('verifactu.software.vendor_name'));
+        $vendorNif  = $software['vendor_tax_id'] ?? config('verifactu.software.vendor_tax_id');
+        $vendorName = $software['vendor_name']   ?? config('verifactu.software.vendor_name');
 
-        $vendorNif = $software['vendor_tax_id'] ?? config('verifactu.software.vendor_tax_id');
+        // When the configured vendor NIF matches the obligado's own NIF (self-developed
+        // software), use the obligado's registered name instead of any placeholder so that
+        // AEAT census validation succeeds (name must match the NIF holder's census record).
+        $companyNif = $this->normalizeSpanishNif($company['tax_number'] ?? '');
+        if ($companyNif && $this->normalizeSpanishNif($vendorNif) === $companyNif) {
+            $vendorName = $company['name'];
+        }
+
+        $this->addText($dom, $si, 'sum:NombreRazon', self::NS_SUM, $vendorName);
         if ($this->isSpanishNif($vendorNif)) {
             $this->addText($dom, $si, 'sum:NIF', self::NS_SUM, $vendorNif);
         } else {
