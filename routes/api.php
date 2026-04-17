@@ -101,6 +101,7 @@ use Crater\Http\Controllers\V1\Admin\Verifactu\ShowDeclarationController as Veri
 use Crater\Http\Controllers\V1\Admin\Verifactu\ShowEventController as VerifactuShowEventController;
 use Crater\Http\Controllers\V1\Admin\Verifactu\ShowRecordController as VerifactuShowRecordController;
 use Crater\Http\Controllers\V1\Admin\Verifactu\ShowSetupController as VerifactuShowSetupController;
+use Crater\Http\Controllers\V1\Admin\Verifactu\UpdateInstallationController as VerifactuUpdateInstallationController;
 use Crater\Http\Controllers\V1\Admin\Verifactu\ShowSubmissionController as VerifactuShowSubmissionController;
 use Crater\Http\Controllers\V1\Admin\Verifactu\UploadCertificateController as VerifactuUploadCertificateController;
 use Crater\Http\Controllers\V1\Admin\Verifactu\DeleteCertificateController as VerifactuDeleteCertificateController;
@@ -264,6 +265,7 @@ Route::prefix('/v1')->group(function () {
             Route::get('/verifactu/submissions', VerifactuListSubmissionsController::class);
             Route::get('/verifactu/events', VerifactuListEventsController::class);
             Route::get('/verifactu/setup', VerifactuShowSetupController::class);
+            Route::put('/verifactu/setup', VerifactuUpdateInstallationController::class);
             Route::post('/verifactu/certificate', VerifactuUploadCertificateController::class);
             Route::delete('/verifactu/certificate', VerifactuDeleteCertificateController::class);
             Route::post('/verifactu/submissions/{submission}/retry', VerifactuRetrySubmissionController::class);
