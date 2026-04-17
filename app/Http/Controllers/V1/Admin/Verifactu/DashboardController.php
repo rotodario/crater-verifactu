@@ -87,10 +87,13 @@ class DashboardController extends Controller
             })
             ->values();
 
+        $effectiveMode = $installation->mode ?? config('verifactu.mode', 'shadow');
+
         return response()->json([
             'environment' => [
                 'enabled'            => $installation ? (bool) $installation->enabled : (bool) config('verifactu.enabled'),
-                'mode'               => $installation->mode ?? config('verifactu.mode', 'shadow'),
+                'mode'               => $effectiveMode,
+                'submission_driver'  => $effectiveMode,
                 'submission_enabled' => $installation ? (bool) $installation->submission_enabled : (bool) config('verifactu.submission_enabled'),
                 'issue_on_send'      => (bool) config('verifactu.issue_on_send'),
                 'software_name'      => config('verifactu.software.name'),
