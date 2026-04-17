@@ -67,9 +67,11 @@ class VerifactuXmlBuilder
         $body->appendChild($root);
 
         // ------------------------------------------------------------------ //
-        // Cabecera
+        // Cabecera — locally defined in SuministroLR.xsd → sum1 namespace
+        // Its children (ObligadoEmision etc.) come from CabeceraType in
+        // SuministroInformacion.xsd → sum namespace
         // ------------------------------------------------------------------ //
-        $cabecera = $dom->createElementNS(self::NS_SUM, 'sum:Cabecera');
+        $cabecera = $dom->createElementNS(self::NS_SUM1, 'sum1:Cabecera');
         $root->appendChild($cabecera);
 
         $obligado = $dom->createElementNS(self::NS_SUM, 'sum:ObligadoEmision');
@@ -317,8 +319,8 @@ class VerifactuXmlBuilder
         $root = $dom->createElementNS(self::NS_SUM1, 'sum1:RegFactuSistemaFacturacion');
         $body->appendChild($root);
 
-        // Cabecera
-        $cabecera = $dom->createElementNS(self::NS_SUM, 'sum:Cabecera');
+        // Cabecera — same namespace rule as buildAlta
+        $cabecera = $dom->createElementNS(self::NS_SUM1, 'sum1:Cabecera');
         $root->appendChild($cabecera);
         $obligado = $dom->createElementNS(self::NS_SUM, 'sum:ObligadoEmision');
         $cabecera->appendChild($obligado);
