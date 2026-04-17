@@ -8,12 +8,12 @@ use SimpleXMLElement;
 /**
  * Parses the SOAP response from the AEAT VERI*FACTU web service.
  *
- * Expected response root: RespuestaSuministroLR
- * Namespace: https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/RespuestaSuministroLR.xsd
+ * Expected response root: RespuestaRegFactuSistemaFacturacion
+ * Namespace: https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/RespuestaSuministro.xsd
  */
 class AeatResponseParser
 {
-    const NS_RESP = 'https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/RespuestaSuministroLR.xsd';
+    const NS_RESP = 'https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/RespuestaSuministro.xsd';
 
     /**
      * Parse raw SOAP XML and return a structured result array:
@@ -63,14 +63,13 @@ class AeatResponseParser
         $nsMap = ['r' => self::NS_RESP];
         $xml->registerXPathNamespace('r', self::NS_RESP);
 
-        $respNodes = $xml->xpath('//r:RespuestaSuministroLR');
+        $respNodes = $xml->xpath('//r:RespuestaRegFactuSistemaFacturacion');
         if (empty($respNodes)) {
-            // Fallback: try without namespace (some sandbox responses omit it)
-            $respNodes = $xml->xpath('//*[local-name()="RespuestaSuministroLR"]');
+            $respNodes = $xml->xpath('//*[local-name()="RespuestaRegFactuSistemaFacturacion"]');
         }
 
         if (empty($respNodes)) {
-            throw new RuntimeException('RespuestaSuministroLR element not found in AEAT response.');
+            throw new RuntimeException('RespuestaRegFactuSistemaFacturacion element not found in AEAT response.');
         }
 
         $resp  = $respNodes[0];

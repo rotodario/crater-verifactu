@@ -111,9 +111,10 @@ class VerifactuXmlBuilder
             $destinatarios->appendChild($idDestinatario);
             $this->addText($dom, $idDestinatario, 'sum:NombreRazon', self::NS_SUM, $customer['name']);
 
-            $taxNumber = $customer['tax_number'] ?? '';
-            if ($this->isSpanishNif($taxNumber)) {
-                $this->addText($dom, $idDestinatario, 'sum:NIF', self::NS_SUM, $taxNumber);
+            $taxNumber     = $customer['tax_number'] ?? '';
+            $normalizedNif = $this->normalizeSpanishNif($taxNumber);
+            if ($normalizedNif !== null) {
+                $this->addText($dom, $idDestinatario, 'sum:NIF', self::NS_SUM, $normalizedNif);
             } else {
                 $idOtro = $dom->createElementNS(self::NS_SUM, 'sum:IDOtro');
                 $idDestinatario->appendChild($idOtro);
@@ -353,11 +354,34 @@ class VerifactuXmlBuilder
         $parent->appendChild($el);
     }
 
-    private function isSpanishNif(?string $nif): bool
+    /**
+     * Returns the normalised Spanish NIF (9 chars) if the value is a valid
+     * Spanish tax ID, or null if it's foreign/unknown.
+     *
+     * Handles the common case where the stored value includes the ES country
+     * prefix (e.g. "ESB59825075" → "B59825075").
+     */
+    private function normalizeSpanishNif(?string $nif): ?string
     {
         if (! $nif) {
-            return false;
+            return null;
         }
-        return (bool) preg_match('/^[A-Z0-9]{9}$/i', trim($nif));
+        $nif = strtoupper(trim($nif));
+
+        // Strip ES country prefix if present and remainder is a valid 9-char NIF
+        if (str_starts_with($nif, 'ES') && preg_match('/^[A-Z0-9]{9}$/', substr($nif, 2))) {
+            return substr($nif, 2);
+        }
+
+        if (preg_match('/^[A-Z0-9]{9}$/', $nif)) {
+            return $nif;
+        }
+
+        return null;
+    }
+
+    private function isSpanishNif(?string $nif): bool
+    {
+        return $this->normalizeSpanishNif($nif) !== null;
     }
 }
