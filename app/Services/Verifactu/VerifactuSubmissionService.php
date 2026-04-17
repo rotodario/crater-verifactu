@@ -16,11 +16,19 @@ class VerifactuSubmissionService
 
     public function queueSubmission(VerifactuRecord $record): ?VerifactuSubmission
     {
-        if (! $this->driverManager->shouldSubmit()) {
+        $installation = $record->installation;
+
+        if ($installation && ! $this->driverManager->shouldSubmitForInstallation($installation)) {
             return null;
         }
 
-        $driver = $this->driverManager->forCurrentMode();
+        if (! $installation && ! $this->driverManager->shouldSubmit()) {
+            return null;
+        }
+
+        $driver = $installation
+            ? $this->driverManager->forInstallation($installation)
+            : $this->driverManager->forCurrentMode();
 
         $submission = VerifactuSubmission::create([
             'verifactu_record_id' => $record->id,

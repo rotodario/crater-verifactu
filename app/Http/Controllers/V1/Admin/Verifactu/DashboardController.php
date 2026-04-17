@@ -4,6 +4,7 @@ namespace Crater\Http\Controllers\V1\Admin\Verifactu;
 
 use Crater\Http\Controllers\Controller;
 use Crater\Models\VerifactuEvent;
+use Crater\Models\VerifactuInstallation;
 use Crater\Models\VerifactuRecord;
 use Crater\Models\VerifactuSubmission;
 use Illuminate\Http\Request;
@@ -16,6 +17,8 @@ class DashboardController extends Controller
         $this->authorize('viewAny', VerifactuRecord::class);
 
         $companyId = $request->header('company');
+
+        $installation = VerifactuInstallation::where('company_id', $companyId)->first();
 
         $recordQuery = VerifactuRecord::query()->where('company_id', $companyId);
         $submissionQuery = VerifactuSubmission::query()->where('company_id', $companyId);
@@ -86,13 +89,12 @@ class DashboardController extends Controller
 
         return response()->json([
             'environment' => [
-                'enabled' => (bool) config('verifactu.enabled'),
-                'mode' => config('verifactu.mode', 'shadow'),
-                'issue_on_send' => (bool) config('verifactu.issue_on_send'),
-                'submission_enabled' => (bool) config('verifactu.submission_enabled'),
-                'submission_driver' => config('verifactu.submission_driver', 'stub'),
-                'software_name' => config('verifactu.software.name'),
-                'software_version' => config('verifactu.software.version'),
+                'enabled'            => $installation ? (bool) $installation->enabled : (bool) config('verifactu.enabled'),
+                'mode'               => $installation->mode ?? config('verifactu.mode', 'shadow'),
+                'submission_enabled' => $installation ? (bool) $installation->submission_enabled : (bool) config('verifactu.submission_enabled'),
+                'issue_on_send'      => (bool) config('verifactu.issue_on_send'),
+                'software_name'      => config('verifactu.software.name'),
+                'software_version'   => config('verifactu.software.version'),
             ],
             'summary' => [
                 'records_total' => (clone $recordQuery)->count(),

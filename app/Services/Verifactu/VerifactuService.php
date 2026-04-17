@@ -51,6 +51,10 @@ class VerifactuService
 
         $installation = $this->resolver->resolveForCompany($invoice->company_id);
 
+        if ($this->driverManager->isOffForInstallation($installation)) {
+            return null;
+        }
+
         $validation = $this->validator->validate($invoice, $installation);
 
         if (! $validation['valid']) {
@@ -109,6 +113,10 @@ class VerifactuService
         }
 
         $installation = $this->resolver->resolveForCompany($invoice->company_id);
+
+        if ($this->driverManager->isOffForInstallation($installation)) {
+            return null;
+        }
 
         // Build a cancellation record using the same snapshot as the original
         $originalRecord = $invoice->verifactuRecord;

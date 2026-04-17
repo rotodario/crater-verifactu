@@ -17,7 +17,7 @@ class UpdateInstallationController extends Controller
         $companyId = (int) $request->header('company');
 
         $validated = $request->validate([
-            'mode'               => ['required', Rule::in(['shadow', 'aeat_sandbox', 'aeat_production'])],
+            'mode'               => ['required', Rule::in(['shadow', 'stub', 'aeat_sandbox', 'aeat_production'])],
             'enabled'            => ['required', 'boolean'],
             'submission_enabled' => ['required', 'boolean'],
             'environment'        => ['required', Rule::in(['local', 'sandbox', 'production'])],
