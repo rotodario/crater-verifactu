@@ -156,7 +156,144 @@
         </div>
       </div>
 
-      <!-- ── CONFIGURACIÓN ── -->
+      <!-- ── PLATAFORMA SIF ── -->
+      <div v-if="activeTab === 'plataforma'">
+        <BaseCard>
+          <template #header>
+            <div class="flex items-center justify-between">
+              <h3 class="font-semibold text-gray-900">Identificación SIF de la plataforma</h3>
+              <span v-if="!canManage" class="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                <BaseIcon name="LockClosedIcon" class="h-3 w-3" />
+                Solo lectura
+              </span>
+            </div>
+          </template>
+
+          <!-- Info banner -->
+          <div class="flex items-start gap-3 p-4 mb-6 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800">
+            <BaseIcon name="InformationCircleIcon" class="h-5 w-5 shrink-0 mt-0.5 text-blue-500" />
+            <div>
+              <p class="font-semibold">Configuración global — compartida por todas las empresas</p>
+              <p class="mt-1">
+                El <strong>IdSistemaInformatico</strong> identifica el software ante la AEAT en cada envío de factura.
+                Es único para toda la plataforma y lo obtienes al presentar la Declaración Responsable.
+                Cada empresa firma con su propio certificado pero comparte este identificador de software.
+              </p>
+            </div>
+          </div>
+
+          <div class="space-y-5">
+            <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <BaseInputGroup
+                label="Nombre del software (NombreSistemaInformatico)"
+                :error="platformErrors.software_name"
+                required
+              >
+                <BaseInput
+                  v-model="platformForm.software_name"
+                  :disabled="!canManage"
+                  type="text"
+                  placeholder="Crater VERI*FACTU"
+                  :invalid="!!platformErrors.software_name"
+                />
+              </BaseInputGroup>
+
+              <BaseInputGroup
+                label="Versión"
+                :error="platformErrors.software_version"
+                required
+              >
+                <BaseInput
+                  v-model="platformForm.software_version"
+                  :disabled="!canManage"
+                  type="text"
+                  placeholder="1.0.0"
+                  class="font-mono"
+                  :invalid="!!platformErrors.software_version"
+                />
+              </BaseInputGroup>
+            </div>
+
+            <fieldset class="border border-gray-200 rounded-lg p-4">
+              <legend class="px-2 text-sm font-medium text-gray-700">Desarrollador del SIF</legend>
+              <p class="mt-1 mb-4 text-xs text-gray-500">
+                Los datos del desarrollador que aparecen en el bloque <span class="font-mono">SistemaInformatico</span> de cada XML enviado a la AEAT.
+              </p>
+              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <BaseInputGroup
+                  label="Nombre o razón social (NombreRazon)"
+                  :error="platformErrors.vendor_name"
+                  required
+                >
+                  <BaseInput
+                    v-model="platformForm.vendor_name"
+                    :disabled="!canManage"
+                    type="text"
+                    placeholder="Tu empresa desarrolladora S.L."
+                    :invalid="!!platformErrors.vendor_name"
+                  />
+                </BaseInputGroup>
+
+                <BaseInputGroup
+                  label="NIF del desarrollador"
+                  :error="platformErrors.vendor_tax_id"
+                  required
+                >
+                  <BaseInput
+                    v-model="platformForm.vendor_tax_id"
+                    :disabled="!canManage"
+                    type="text"
+                    placeholder="B12345678"
+                    class="font-mono uppercase"
+                    :invalid="!!platformErrors.vendor_tax_id"
+                  />
+                </BaseInputGroup>
+              </div>
+            </fieldset>
+
+            <fieldset class="border border-gray-200 rounded-lg p-4">
+              <legend class="px-2 text-sm font-medium text-gray-700">Registro AEAT</legend>
+              <p class="mt-1 mb-4 text-xs text-gray-500">
+                El <strong>IdSistemaInformatico</strong> se obtiene al presentar la Declaración Responsable ante la AEAT.
+                Puedes usar cualquier identificador durante desarrollo (modo <span class="font-mono">shadow</span>).
+                Es obligatorio para los modos <span class="font-mono">aeat_sandbox</span> y <span class="font-mono">aeat_production</span>.
+              </p>
+              <div class="max-w-sm">
+                <BaseInputGroup
+                  label="IdSistemaInformatico"
+                  :error="platformErrors.software_id"
+                  required
+                >
+                  <BaseInput
+                    v-model="platformForm.software_id"
+                    :disabled="!canManage"
+                    type="text"
+                    placeholder="CRATER-VF-01"
+                    class="font-mono"
+                    :invalid="!!platformErrors.software_id"
+                  />
+                </BaseInputGroup>
+              </div>
+            </fieldset>
+
+            <div v-if="canManage" class="flex items-center gap-3 pt-2 border-t border-gray-100">
+              <BaseButton
+                variant="primary"
+                :loading="savingPlatform"
+                @click="onSavePlatform"
+              >
+                <template #left="slotProps">
+                  <BaseIcon name="SaveIcon" :class="slotProps.class" />
+                </template>
+                {{ $t('general.save') }}
+              </BaseButton>
+              <span v-if="savePlatformSuccess" class="text-sm text-green-600">Guardado correctamente.</span>
+            </div>
+          </div>
+        </BaseCard>
+      </div>
+
+      <!-- ── CONFIGURACIÓN EMPRESA ── -->
       <div v-if="activeTab === 'configuracion'">
         <BaseCard>
           <template #header>
@@ -271,48 +408,6 @@
                     />
                   </BaseInputGroup>
                 </div>
-              </div>
-            </fieldset>
-
-            <!-- SIF / Software identification -->
-            <fieldset class="border border-gray-200 rounded-lg p-4">
-              <legend class="px-2 text-sm font-medium text-gray-700">Identificación SIF (Sistema de Información Fiscal)</legend>
-              <p class="mt-2 mb-4 text-xs text-gray-500">
-                Estos datos identifican el software ante la AEAT en cada envío. El <strong>IdSistemaInformatico</strong>
-                se obtiene al registrar el software en la AEAT mediante una Declaración Responsable.
-                En modo <span class="font-mono">shadow</span> puedes dejarlo vacío; es obligatorio para sandbox y producción.
-              </p>
-              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <BaseInputGroup label="Nombre del desarrollador (NombreRazon)">
-                  <BaseInput
-                    v-model="configForm.vendor_name"
-                    :disabled="!canManage"
-                    type="text"
-                    placeholder="Empresa Desarrolladora S.L."
-                  />
-                </BaseInputGroup>
-                <BaseInputGroup label="NIF del desarrollador">
-                  <BaseInput
-                    v-model="configForm.vendor_tax_id"
-                    :disabled="!canManage"
-                    type="text"
-                    placeholder="B12345678"
-                    class="font-mono"
-                  />
-                </BaseInputGroup>
-                <BaseInputGroup
-                  label="IdSistemaInformatico (SIF)"
-                  :error="configErrors.software_id"
-                >
-                  <BaseInput
-                    v-model="configForm.software_id"
-                    :disabled="!canManage"
-                    type="text"
-                    placeholder="CRATER-VF-01"
-                    class="font-mono"
-                    :invalid="!!configErrors.software_id"
-                  />
-                </BaseInputGroup>
                 <BaseInputGroup label="NumeroInstalacion">
                   <BaseInput
                     v-model="configForm.installation_number"
@@ -546,12 +641,15 @@ const userStore = useUserStore()
 
 const loading = ref(false)
 const saving = ref(false)
+const savingPlatform = ref(false)
+const savePlatformSuccess = ref(false)
 const saveSuccess = ref(false)
 const uploading = ref(false)
 const deletingCert = ref(false)
 
 const installation = ref(null)
 const declarations = ref([])
+const platform = ref(null)
 const activeTab = ref('resumen')
 
 const fileInput = ref(null)
@@ -561,6 +659,24 @@ const certPassword = ref('')
 const showPassword = ref(false)
 const uploadError = ref('')
 
+// Global platform SIF form (shared across all companies)
+const platformForm = reactive({
+  software_name: '',
+  software_version: '',
+  vendor_name: '',
+  vendor_tax_id: '',
+  software_id: '',
+})
+
+const platformErrors = reactive({
+  software_name: '',
+  software_version: '',
+  vendor_name: '',
+  vendor_tax_id: '',
+  software_id: '',
+})
+
+// Per-company installation form
 const configForm = reactive({
   enabled: true,
   submission_enabled: false,
@@ -568,22 +684,18 @@ const configForm = reactive({
   environment: 'local',
   issuer_name: '',
   issuer_tax_id: '',
-  // SIF identification
-  vendor_name: '',
-  vendor_tax_id: '',
-  software_id: '',
   installation_number: '1',
 })
 
 const configErrors = reactive({
   issuer_name: '',
   issuer_tax_id: '',
-  software_id: '',
 })
 
 const tabs = [
   { id: 'resumen', label: 'Resumen' },
-  { id: 'configuracion', label: 'Configuración' },
+  { id: 'plataforma', label: 'Plataforma SIF' },
+  { id: 'configuracion', label: 'Configuración empresa' },
   { id: 'certificados', label: 'Certificados' },
   { id: 'declaraciones', label: 'Declaraciones' },
 ]
@@ -613,26 +725,30 @@ function declarationBadgeClass(status) {
   return 'bg-gray-100 text-gray-600'
 }
 
+function syncPlatformForm() {
+  if (!platform.value) return
+  platformForm.software_name   = platform.value.software_name   || ''
+  platformForm.software_version= platform.value.software_version || ''
+  platformForm.vendor_name     = platform.value.vendor_name     || ''
+  platformForm.vendor_tax_id   = platform.value.vendor_tax_id   || ''
+  platformForm.software_id     = platform.value.software_id     || ''
+}
+
 function syncFormFromInstallation() {
   if (!installation.value) return
-  configForm.enabled = installation.value.enabled
-  configForm.submission_enabled = installation.value.submission_enabled
-  configForm.mode = installation.value.mode || 'shadow'
-  configForm.environment = installation.value.environment || 'local'
-  configForm.issuer_name = installation.value.issuer_name || ''
-  configForm.issuer_tax_id = installation.value.issuer_tax_id || ''
-  configForm.vendor_name = installation.value.vendor_name || ''
-  configForm.vendor_tax_id = installation.value.vendor_tax_id || ''
-  configForm.software_id = installation.value.software_id || ''
+  configForm.enabled             = installation.value.enabled
+  configForm.submission_enabled  = installation.value.submission_enabled
+  configForm.mode                = installation.value.mode || 'shadow'
+  configForm.environment         = installation.value.environment || 'local'
+  configForm.issuer_name         = installation.value.issuer_name || ''
+  configForm.issuer_tax_id       = installation.value.issuer_tax_id || ''
   configForm.installation_number = installation.value.installation_number || '1'
 }
 
 function validateConfig() {
   configErrors.issuer_name = ''
   configErrors.issuer_tax_id = ''
-  configErrors.software_id = ''
   let valid = true
-
   if (!configForm.issuer_name.trim()) {
     configErrors.issuer_name = 'El nombre es obligatorio.'
     valid = false
@@ -644,12 +760,35 @@ function validateConfig() {
     configErrors.issuer_tax_id = 'El NIF/CIF debe tener entre 7 y 15 caracteres alfanuméricos.'
     valid = false
   }
-  // software_id is required when using AEAT endpoints
-  if (['aeat_sandbox', 'aeat_production'].includes(configForm.mode) && !configForm.software_id.trim()) {
-    configErrors.software_id = 'El IdSistemaInformatico es obligatorio en modo sandbox/producción.'
-    valid = false
-  }
   return valid
+}
+
+async function onSavePlatform() {
+  Object.keys(platformErrors).forEach(k => (platformErrors[k] = ''))
+  savePlatformSuccess.value = false
+  savingPlatform.value = true
+  try {
+    const { data } = await axios.put('/api/v1/verifactu/platform', {
+      software_name:    platformForm.software_name.trim(),
+      software_version: platformForm.software_version.trim(),
+      vendor_name:      platformForm.vendor_name.trim(),
+      vendor_tax_id:    platformForm.vendor_tax_id.trim().toUpperCase(),
+      software_id:      platformForm.software_id.trim(),
+    })
+    platform.value = data.platform
+    syncPlatformForm()
+    savePlatformSuccess.value = true
+    notificationStore.showNotification({ type: 'success', message: 'Configuración de plataforma SIF guardada.' })
+  } catch (error) {
+    if (error.response?.data?.errors) {
+      const errs = error.response.data.errors
+      Object.keys(platformErrors).forEach(k => { platformErrors[k] = errs[k]?.[0] || '' })
+    } else {
+      handleError(error)
+    }
+  } finally {
+    savingPlatform.value = false
+  }
 }
 
 // ── API calls ─────────────────────────────────────────────────────────────────
@@ -657,10 +796,15 @@ function validateConfig() {
 async function loadSetup() {
   loading.value = true
   try {
-    const { data } = await axios.get('/api/v1/verifactu/setup')
-    installation.value = data.installation || null
-    declarations.value = data.declarations || []
+    const [setupRes, platformRes] = await Promise.all([
+      axios.get('/api/v1/verifactu/setup'),
+      axios.get('/api/v1/verifactu/platform'),
+    ])
+    installation.value = setupRes.data.installation || null
+    declarations.value = setupRes.data.declarations || []
+    platform.value = platformRes.data.platform || null
     syncFormFromInstallation()
+    syncPlatformForm()
   } catch (error) {
     handleError(error)
   } finally {
@@ -675,15 +819,12 @@ async function onSaveConfig() {
   saving.value = true
   try {
     const { data } = await axios.put('/api/v1/verifactu/setup', {
-      mode: configForm.mode,
-      enabled: configForm.enabled,
-      submission_enabled: configForm.submission_enabled,
-      environment: configForm.environment,
-      issuer_name: configForm.issuer_name.trim(),
-      issuer_tax_id: configForm.issuer_tax_id.trim().toUpperCase(),
-      vendor_name: configForm.vendor_name.trim() || null,
-      vendor_tax_id: configForm.vendor_tax_id.trim().toUpperCase() || null,
-      software_id: configForm.software_id.trim() || null,
+      mode:                configForm.mode,
+      enabled:             configForm.enabled,
+      submission_enabled:  configForm.submission_enabled,
+      environment:         configForm.environment,
+      issuer_name:         configForm.issuer_name.trim(),
+      issuer_tax_id:       configForm.issuer_tax_id.trim().toUpperCase(),
       installation_number: configForm.installation_number.trim() || '1',
     })
 
@@ -698,9 +839,8 @@ async function onSaveConfig() {
   } catch (error) {
     if (error.response?.data?.errors) {
       const errs = error.response.data.errors
-      configErrors.issuer_name = errs.issuer_name?.[0] || ''
+      configErrors.issuer_name   = errs.issuer_name?.[0]   || ''
       configErrors.issuer_tax_id = errs.issuer_tax_id?.[0] || ''
-      configErrors.software_id = errs.software_id?.[0] || ''
     } else {
       handleError(error)
     }

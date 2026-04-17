@@ -4,6 +4,7 @@ namespace Crater\Services\Verifactu;
 
 use Crater\Models\Invoice;
 use Crater\Models\VerifactuInstallation;
+use Crater\Models\VerifactuPlatformConfig;
 use Crater\Models\VerifactuRecord;
 use Illuminate\Support\Carbon;
 
@@ -19,6 +20,8 @@ class VerifactuRecordBuilder
             'taxes.taxType',
             'currency',
         ]);
+
+        $platform = VerifactuPlatformConfig::current();
 
         $issuedAt = Carbon::now();
         $previousRecord = VerifactuRecord::where('company_id', $invoice->company_id)
@@ -90,12 +93,14 @@ class VerifactuRecordBuilder
                 ];
             })->values()->toArray(),
             'software' => [
-                'name'                => $installation->software_name    ?: config('verifactu.software.name'),
-                'version'             => $installation->software_version  ?: config('verifactu.software.version'),
-                'vendor_name'         => $installation->vendor_name       ?: config('verifactu.software.vendor_name'),
-                'vendor_tax_id'       => $installation->vendor_tax_id     ?: config('verifactu.software.vendor_tax_id'),
-                'software_id'         => $installation->software_id       ?: config('verifactu.software.id', 'CRATER-VF-01'),
+                // Per-installation fields (company-specific)
+                'name'                => $installation->software_name     ?: $platform->software_name    ?: config('verifactu.software.name'),
+                'version'             => $installation->software_version   ?: $platform->software_version ?: config('verifactu.software.version'),
                 'installation_number' => $installation->installation_number ?: config('verifactu.software.installation_number', '1'),
+                // Global platform SIF identity (same for every company on this deployment)
+                'vendor_name'         => $platform->vendor_name    ?: config('verifactu.software.vendor_name'),
+                'vendor_tax_id'       => $platform->vendor_tax_id  ?: config('verifactu.software.vendor_tax_id'),
+                'software_id'         => $platform->software_id    ?: config('verifactu.software.id', 'CRATER-VF-01'),
             ],
         ];
 
