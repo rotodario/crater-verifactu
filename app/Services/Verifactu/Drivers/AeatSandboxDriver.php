@@ -49,17 +49,21 @@ class AeatSandboxDriver implements VerifactuDriverInterface
 
         // 3. Send to AEAT sandbox
         $installation = $record->installation;
+        $verifySsl  = (bool) config('verifactu.aeat.sandbox_verify_ssl', false);
+
         $httpClient   = $installation && $installation->hasCertificate()
             ? new AeatHttpClient(
                 endpointUrl:  config('verifactu.aeat.sandbox_url'),
                 certPassword: $installation->getCertPassword(),
                 certData:     $installation->getCertBytes(),
                 certType:     $installation->cert_type ?? 'p12',
+                verifySsl:    $verifySsl,
             )
             : new AeatHttpClient(
                 endpointUrl:  config('verifactu.aeat.sandbox_url'),
                 certPath:     config('verifactu.aeat.certificate_path'),
                 certPassword: config('verifactu.aeat.certificate_password', ''),
+                verifySsl:    $verifySsl,
             );
 
         $responseXml = $httpClient->send($requestXml);

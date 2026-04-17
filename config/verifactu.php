@@ -78,6 +78,9 @@ return [
         'production_url' => env('VERIFACTU_AEAT_PRODUCTION_URL'),
         'certificate_path'     => env('VERIFACTU_CERT_PATH'),
         'certificate_password' => env('VERIFACTU_CERT_PASSWORD'),
+        // AEAT pre-production (prewww) uses a self-signed CA not in the default bundle.
+        // Set to false for sandbox only; production always verifies.
+        'sandbox_verify_ssl'   => env('VERIFACTU_AEAT_SANDBOX_VERIFY_SSL', false),
     ],
 
 ];

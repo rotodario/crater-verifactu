@@ -23,6 +23,7 @@ class AeatHttpClient
         protected int     $timeoutSeconds = 30,
         protected ?string $certData = null,   // raw bytes from DB (alternative to certPath)
         protected ?string $certType = null,   // 'p12' or 'pem' (required when certData set)
+        protected bool    $verifySsl = true,  // set false for AEAT pre-production (self-signed CA)
     ) {}
 
     /**
@@ -38,7 +39,7 @@ class AeatHttpClient
             $client = new Client([
                 'timeout'         => $this->timeoutSeconds,
                 'connect_timeout' => 10,
-                'verify'          => true,   // verify AEAT server certificate
+                'verify'          => $this->verifySsl,
                 'cert'            => $certFile,
                 // Key extracted from PKCS12 is already unencrypted PEM; PEM files
                 // may carry a password. Only pass password when non-empty.
