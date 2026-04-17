@@ -7,7 +7,7 @@ use DOMDocument;
 use DOMElement;
 
 /**
- * Builds the SOAP/XML payload for a VERI*FACTU SuministroLRFacturasEmitidas
+ * Builds the SOAP/XML payload for a VERI*FACTU RegFactuSistemaFacturacion
  * request following the AEAT schema v1.0.
  *
  * Namespaces:
@@ -62,8 +62,8 @@ class VerifactuXmlBuilder
         $body = $dom->createElementNS(self::NS_SOAP, 'soapenv:Body');
         $envelope->appendChild($body);
 
-        // SuministroLRFacturasEmitidas
-        $root = $dom->createElementNS(self::NS_SUM1, 'sum1:SuministroLRFacturasEmitidas');
+        // RegFactuSistemaFacturacion — root element as defined in the AEAT XSD
+        $root = $dom->createElementNS(self::NS_SUM1, 'sum1:RegFactuSistemaFacturacion');
         $body->appendChild($root);
 
         // ------------------------------------------------------------------ //
@@ -314,7 +314,7 @@ class VerifactuXmlBuilder
         $body = $dom->createElementNS(self::NS_SOAP, 'soapenv:Body');
         $envelope->appendChild($body);
 
-        $root = $dom->createElementNS(self::NS_SUM1, 'sum1:SuministroLRFacturasEmitidas');
+        $root = $dom->createElementNS(self::NS_SUM1, 'sum1:RegFactuSistemaFacturacion');
         $body->appendChild($root);
 
         // Cabecera
