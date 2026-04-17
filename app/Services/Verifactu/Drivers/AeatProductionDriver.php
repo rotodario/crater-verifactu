@@ -85,10 +85,16 @@ class AeatProductionDriver implements VerifactuDriverInterface
         $submission->response_payload = $parsed;
 
         if ($parsed['accepted']) {
+            $hasLineErrors = collect($parsed['lines'])
+                ->contains(fn($l) => ! in_array($l['estado'], ['Correcto', 'AceptadoConErrores'], true));
+
             $submission->status             = 'ACCEPTED';
             $submission->csv                = $parsed['csv'];
             $submission->external_reference = $parsed['csv'];
             $submission->completed_at       = Carbon::now();
+            if ($hasLineErrors) {
+                $submission->error_message = $parser->summariseErrors($parsed);
+            }
             $submission->save();
 
             $record->status = 'ACCEPTED';

@@ -77,7 +77,10 @@ class AeatResponseParser
 
         $csv         = $this->nodeText($resp, 'CSV');
         $estadoEnvio = $this->nodeText($resp, 'EstadoEnvio') ?: 'IncorrectoError';
-        $accepted    = ($estadoEnvio === 'Correcto');
+        // Correcto            → all records accepted, no errors
+        // ParcialmenteCorrecto→ at least one record accepted (may have warnings)
+        // Incorrecto          → all records rejected
+        $accepted    = in_array($estadoEnvio, ['Correcto', 'ParcialmenteCorrecto'], true);
 
         // RespuestaLinea entries
         $lines = [];

@@ -92,13 +92,22 @@ class AeatSandboxDriver implements VerifactuDriverInterface
         $submission->response_payload = $parsed;
 
         if ($parsed['accepted']) {
-            $submission->status           = 'ACCEPTED';
-            $submission->csv              = $parsed['csv'];
+            // Check line-level status — AceptadoConErrores means AEAT registered the
+            // record but flagged a warning (e.g. hash mismatch on old records).
+            // We still mark it ACCEPTED since AEAT has created the fiscal register.
+            $hasLineErrors = collect($parsed['lines'])
+                ->contains(fn($l) => ! in_array($l['estado'], ['Correcto', 'AceptadoConErrores'], true));
+
+            $submission->status             = 'ACCEPTED';
+            $submission->csv                = $parsed['csv'];
             $submission->external_reference = $parsed['csv'];
-            $submission->completed_at     = Carbon::now();
+            $submission->completed_at       = Carbon::now();
+            if ($hasLineErrors) {
+                $submission->error_message = $parser->summariseErrors($parsed);
+            }
             $submission->save();
 
-            $record->status     = 'ACCEPTED';
+            $record->status = 'ACCEPTED';
             $record->save();
         } else {
             $errorSummary = $parser->summariseErrors($parsed);
