@@ -44,10 +44,12 @@ class ResetFiscalIssuanceController extends Controller
             $record->submissions()->delete();
             $record->delete();
 
-            // Unlock the invoice so it can be re-issued fiscally
-            $invoice->fiscal_status    = null;
-            $invoice->fiscal_issued_at = null;
-            $invoice->fiscal_locked_at = null;
+            // Unlock the invoice so it can be re-issued fiscally.
+            // Use NOT_ISSUED (not null) so the 'Expedir fiscalmente' button
+            // reappears correctly — null leaves the invoice in a button-less limbo.
+            $invoice->fiscal_status       = \Crater\Models\Invoice::FISCAL_STATUS_NOT_ISSUED;
+            $invoice->fiscal_issued_at    = null;
+            $invoice->fiscal_locked_at    = null;
             $invoice->verifactu_record_id = null;
             $invoice->save();
         });
