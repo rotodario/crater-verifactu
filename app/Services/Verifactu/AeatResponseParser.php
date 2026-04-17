@@ -93,12 +93,36 @@ class AeatResponseParser
             $errorCode   = (string) ($line->xpath('*[local-name()="CodigoErrorRegistro"]')[0] ?? '');
             $errorDesc   = (string) ($line->xpath('*[local-name()="DescripcionErrorRegistro"]')[0] ?? '');
 
+            // Error 3000 = duplicate: the record was already registered by a previous
+            // submission. Check the nested RegistroDuplicado for the original status.
+            // Treat as accepted if the duplicate was AceptadaConErrores or Correcto.
+            if ($errorCode === '3000') {
+                $dupNode   = $line->xpath('*[local-name()="RegistroDuplicado"]')[0] ?? null;
+                $dupEstado = $dupNode
+                    ? (string) ($dupNode->xpath('*[local-name()="EstadoRegistroDuplicado"]')[0] ?? '')
+                    : '';
+                if (in_array($dupEstado, ['Correcto', 'AceptadaConErrores', 'AceptadoConErrores'], true)) {
+                    $estadoReg = 'AceptadoConErrores'; // normalise so driver marks as accepted
+                    $errorDesc = 'Duplicado (ya registrado con estado: ' . $dupEstado . ')';
+                }
+            }
+
             $lines[] = [
                 'invoice_number' => $numSerie,
                 'estado'         => $estadoReg,
                 'error_code'     => $errorCode ?: null,
                 'error_desc'     => $errorDesc ?: null,
             ];
+        }
+
+        // Re-evaluate accepted: if ALL lines are Correcto or AceptadoConErrores, consider accepted
+        if (! $accepted && ! empty($lines)) {
+            $allAccepted = collect($lines)->every(
+                fn($l) => in_array($l['estado'], ['Correcto', 'AceptadoConErrores'], true)
+            );
+            if ($allAccepted) {
+                $accepted = true;
+            }
         }
 
         return [
