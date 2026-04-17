@@ -74,13 +74,22 @@ return [
     |--------------------------------------------------------------------------
     */
     'aeat' => [
-        'sandbox_url'    => env('VERIFACTU_AEAT_SANDBOX_URL'),
-        'production_url' => env('VERIFACTU_AEAT_PRODUCTION_URL'),
-        'certificate_path'     => env('VERIFACTU_CERT_PATH'),
-        'certificate_password' => env('VERIFACTU_CERT_PASSWORD'),
+        // VERI*FACTU has two distinct endpoints per environment depending on certificate type.
+        // Persona física / Representante → prewww1 (sandbox) / www1 (production)
+        // Certificado de Sello           → prewww10 (sandbox) / www10 (production)
+        // Source: https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tikeV1.0/cont/ws/SistemaFacturacion.wsdl
+        'sandbox_url'            => env('VERIFACTU_AEAT_SANDBOX_URL',
+            'https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP'),
+        'sandbox_url_sello'      => env('VERIFACTU_AEAT_SANDBOX_URL_SELLO',
+            'https://prewww10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP'),
+        'production_url'         => env('VERIFACTU_AEAT_PRODUCTION_URL',
+            'https://www1.agenciatributaria.gob.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP'),
+        'production_url_sello'   => env('VERIFACTU_AEAT_PRODUCTION_URL_SELLO',
+            'https://www10.agenciatributaria.gob.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP'),
+        'certificate_path'       => env('VERIFACTU_CERT_PATH'),
+        'certificate_password'   => env('VERIFACTU_CERT_PASSWORD'),
         // AEAT pre-production (prewww) uses a self-signed CA not in the default bundle.
-        // Set to false for sandbox only; production always verifies.
-        'sandbox_verify_ssl'   => env('VERIFACTU_AEAT_SANDBOX_VERIFY_SSL', false),
+        'sandbox_verify_ssl'     => env('VERIFACTU_AEAT_SANDBOX_VERIFY_SSL', false),
     ],
 
 ];

@@ -46,16 +46,28 @@ class AeatProductionDriver implements VerifactuDriverInterface
         $submission->save();
 
         // 3. Send to AEAT production
+        // AEAT has two production endpoints depending on certificate type (from the official WSDL):
+        //   www1  → persona física / representante
+        //   www10 → certificado de sello
         $installation = $record->installation;
+        $certBytes    = $installation && $installation->hasCertificate()
+            ? $installation->getCertBytes()
+            : null;
+        $certPassword = $installation && $installation->hasCertificate()
+            ? $installation->getCertPassword()
+            : config('verifactu.aeat.certificate_password', '');
+
+        $endpointUrl  = $this->resolveEndpoint($certBytes, $certPassword);
+
         $httpClient   = $installation && $installation->hasCertificate()
             ? new AeatHttpClient(
-                endpointUrl:  config('verifactu.aeat.production_url'),
+                endpointUrl:  $endpointUrl,
                 certPassword: $installation->getCertPassword(),
                 certData:     $installation->getCertBytes(),
                 certType:     $installation->cert_type ?? 'p12',
             )
             : new AeatHttpClient(
-                endpointUrl:  config('verifactu.aeat.production_url'),
+                endpointUrl:  $endpointUrl,
                 certPath:     config('verifactu.aeat.certificate_path'),
                 certPassword: config('verifactu.aeat.certificate_password', ''),
             );
@@ -87,57 +99,41 @@ class AeatProductionDriver implements VerifactuDriverInterface
         }
     }
 
-    private function ensureConfig(?VerifactuInstallation $installation = null): void
+    private function resolveEndpoint(?string $certBytes, string $password): string
     {
-        if (! config('verifactu.aeat.production_url')) {
-            throw new RuntimeException('VERIFACTU_AEAT_PRODUCTION_URL is not configured.');
+        $default = config('verifactu.aeat.production_url');
+        $sello   = config('verifactu.aeat.production_url_sello');
+
+        if (! $certBytes) {
+            return $default;
         }
 
+        $certs = [];
+        if (! @openssl_pkcs12_read($certBytes, $certs, $password)) {
+            return $default;
+        }
+
+        if (empty($certs['cert'])) {
+            return $default;
+        }
+
+        $parsed   = openssl_x509_parse($certs['cert']);
+        $serial   = $parsed['subject']['serialNumber'] ?? '';
+        $policies = $parsed['extensions']['certificatePolicies'] ?? '';
+
+        $isPersonaFisica = str_starts_with($serial, 'IDCES-')
+            || str_contains($policies, '1.3.6.1.4.1.5734.3.10.1');
+
+        return $isPersonaFisica ? $default : $sello;
+    }
+
+    private function ensureConfig(?VerifactuInstallation $installation = null): void
+    {
         $hasCert = ($installation && $installation->hasCertificate())
             || config('verifactu.aeat.certificate_path');
 
         if (! $hasCert) {
             throw new RuntimeException('No certificate configured. Upload one in VERI*FACTU Setup.');
-        }
-
-        if ($installation && $installation->hasCertificate()) {
-            $this->warnIfPersonalCertificate($installation->getCertBytes(), $installation->getCertPassword());
-        } elseif ($path = config('verifactu.aeat.certificate_path')) {
-            if (file_exists($path)) {
-                $this->warnIfPersonalCertificate(file_get_contents($path), config('verifactu.aeat.certificate_password', ''));
-            }
-        }
-    }
-
-    private function warnIfPersonalCertificate(string $certBytes, string $password): void
-    {
-        $certs = [];
-        if (! @openssl_pkcs12_read($certBytes, $certs, $password)) {
-            return;
-        }
-
-        if (empty($certs['cert'])) {
-            return;
-        }
-
-        $parsed = openssl_x509_parse($certs['cert']);
-
-        $serial = $parsed['subject']['serialNumber'] ?? '';
-        if (str_starts_with($serial, 'IDCES-')) {
-            throw new RuntimeException(
-                'Certificado de persona física detectado (serialNumber: ' . $serial . '). ' .
-                'AEAT VERI*FACTU solo acepta Certificados de Sello de Entidad (persona jurídica). ' .
-                'Obtén un Certificado de Representante de Persona Jurídica en sede.fnmt.gob.es.'
-            );
-        }
-
-        $policies = $parsed['extensions']['certificatePolicies'] ?? '';
-        if (str_contains($policies, '1.3.6.1.4.1.5734.3.10.1')) {
-            throw new RuntimeException(
-                'Certificado FNMT de Ciudadano detectado (OID 1.3.6.1.4.1.5734.3.10.1). ' .
-                'AEAT VERI*FACTU solo acepta Certificados de Sello de Entidad (OID 1.3.6.1.4.1.5734.3.10.5). ' .
-                'Obtén un Certificado de Representante de Persona Jurídica en sede.fnmt.gob.es.'
-            );
         }
     }
 }

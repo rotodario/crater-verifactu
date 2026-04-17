@@ -48,19 +48,32 @@ class AeatSandboxDriver implements VerifactuDriverInterface
         $submission->save();
 
         // 3. Send to AEAT sandbox
+        // AEAT has two sandbox endpoints depending on certificate type (from the official WSDL):
+        //   prewww1  → persona física / representante
+        //   prewww10 → certificado de sello
+        // Auto-select based on the loaded certificate; fall back to config default.
         $installation = $record->installation;
-        $verifySsl  = (bool) config('verifactu.aeat.sandbox_verify_ssl', false);
+        $verifySsl    = (bool) config('verifactu.aeat.sandbox_verify_ssl', false);
+
+        $certBytes    = $installation && $installation->hasCertificate()
+            ? $installation->getCertBytes()
+            : null;
+        $certPassword = $installation && $installation->hasCertificate()
+            ? $installation->getCertPassword()
+            : config('verifactu.aeat.certificate_password', '');
+
+        $endpointUrl  = $this->resolveEndpoint($certBytes, $certPassword);
 
         $httpClient   = $installation && $installation->hasCertificate()
             ? new AeatHttpClient(
-                endpointUrl:  config('verifactu.aeat.sandbox_url'),
+                endpointUrl:  $endpointUrl,
                 certPassword: $installation->getCertPassword(),
                 certData:     $installation->getCertBytes(),
                 certType:     $installation->cert_type ?? 'p12',
                 verifySsl:    $verifySsl,
             )
             : new AeatHttpClient(
-                endpointUrl:  config('verifactu.aeat.sandbox_url'),
+                endpointUrl:  $endpointUrl,
                 certPath:     config('verifactu.aeat.certificate_path'),
                 certPassword: config('verifactu.aeat.certificate_password', ''),
                 verifySsl:    $verifySsl,
@@ -93,71 +106,52 @@ class AeatSandboxDriver implements VerifactuDriverInterface
         }
     }
 
-    private function ensureConfig(?\Crater\Models\VerifactuInstallation $installation = null): void
+    /**
+     * Select the correct AEAT sandbox endpoint based on the certificate type.
+     *
+     * AEAT publishes two endpoints (from the official WSDL):
+     *   prewww1  → persona física / representante
+     *   prewww10 → certificado de sello (tipos 4 y 8 en @firma)
+     *
+     * We detect the type by inspecting the certificate. If detection fails we
+     * fall back to the configured VERIFACTU_AEAT_SANDBOX_URL value.
+     */
+    private function resolveEndpoint(?string $certBytes, string $password): string
     {
-        if (! config('verifactu.aeat.sandbox_url')) {
-            throw new RuntimeException('VERIFACTU_AEAT_SANDBOX_URL is not configured.');
+        $default = config('verifactu.aeat.sandbox_url');
+        $sello   = config('verifactu.aeat.sandbox_url_sello');
+
+        if (! $certBytes) {
+            return $default;
         }
 
+        $certs = [];
+        if (! @openssl_pkcs12_read($certBytes, $certs, $password)) {
+            return $default;
+        }
+
+        if (empty($certs['cert'])) {
+            return $default;
+        }
+
+        $parsed   = openssl_x509_parse($certs['cert']);
+        $serial   = $parsed['subject']['serialNumber'] ?? '';
+        $policies = $parsed['extensions']['certificatePolicies'] ?? '';
+
+        // Sello indicators: no IDCES- prefix and FNMT sello OID present
+        $isPersonaFisica = str_starts_with($serial, 'IDCES-')
+            || str_contains($policies, '1.3.6.1.4.1.5734.3.10.1');
+
+        return $isPersonaFisica ? $default : $sello;
+    }
+
+    private function ensureConfig(?\Crater\Models\VerifactuInstallation $installation = null): void
+    {
         $hasCert = ($installation && $installation->hasCertificate())
             || config('verifactu.aeat.certificate_path');
 
         if (! $hasCert) {
             throw new RuntimeException('No certificate configured. Upload one in VERI*FACTU Setup.');
-        }
-
-        // Pre-flight: detect personal (firma) certificates before AEAT rejects with a cryptic 401.
-        // AEAT VERI*FACTU only accepts Certificados de Sello (tipo 0). Personal DNI/firma
-        // certificates (tipo 1) are rejected at the SOAP layer with "Solo se admiten certificados de SELLO".
-        if ($installation && $installation->hasCertificate()) {
-            $this->warnIfPersonalCertificate($installation->getCertBytes(), $installation->getCertPassword());
-        } elseif ($path = config('verifactu.aeat.certificate_path')) {
-            if (file_exists($path)) {
-                $this->warnIfPersonalCertificate(file_get_contents($path), config('verifactu.aeat.certificate_password', ''));
-            }
-        }
-    }
-
-    /**
-     * Parse the PKCS12 certificate and throw a descriptive error if it is a
-     * personal-signature certificate (persona física / firma electrónica).
-     *
-     * AEAT VERI*FACTU requires a Certificado de Sello de Entidad (OID 1.3.6.1.4.1.5734.3.10.5
-     * for FNMT, or equivalent from other accredited CAs). Personal certificates
-     * (OID 1.3.6.1.4.1.5734.3.10.1 for FNMT Ciudadano, serialNumber starting with IDCES-)
-     * are rejected by the AEAT endpoint with HTTP 401.
-     */
-    private function warnIfPersonalCertificate(string $certBytes, string $password): void
-    {
-        $certs = [];
-        if (! @openssl_pkcs12_read($certBytes, $certs, $password)) {
-            return; // Can't parse — let the actual send fail with its own error.
-        }
-
-        if (empty($certs['cert'])) {
-            return;
-        }
-
-        $parsed = openssl_x509_parse($certs['cert']);
-
-        // Indicator 1: serialNumber contains IDCES- (FNMT DNI personal cert)
-        $serial = $parsed['subject']['serialNumber'] ?? '';
-        if (str_starts_with($serial, 'IDCES-')) {
-            throw new RuntimeException(
-                'Certificado de persona física detectado (serialNumber: ' . $serial . '). ' .
-                'AEAT VERI*FACTU solo acepta Certificados de Sello de Entidad (persona jurídica). ' .
-                'Obtén un Certificado de Representante de Persona Jurídica en sede.fnmt.gob.es.'
-            );
-        }
-
-        // Indicator 2: FNMT OID for Certificado de Ciudadano (1.3.6.1.4.1.5734.3.10.1)
-        $policies = $parsed['extensions']['certificatePolicies'] ?? '';
-        if (str_contains($policies, '1.3.6.1.4.1.5734.3.10.1')) {
-            throw new RuntimeException(
-                'Certificado FNMT de Ciudadano detectado (OID 1.3.6.1.4.1.5734.3.10.1). ' .
-                'AEAT VERI*FACTU solo acepta Certificados de Sello de Entidad (OID 1.3.6.1.4.1.5734.3.10.5). ' .
-                'Obtén un Certificado de Representante de Persona Jurídica en sede.fnmt.gob.es.'
-            );
         }
     }
 }
