@@ -136,7 +136,7 @@ class VerifactuXmlBuilder
             if ($line['tipo_impositivo'] !== null) {
                 $this->addText($dom, $detalle, 'sum:TipoImpositivo', self::NS_SUM, $line['tipo_impositivo']);
             }
-            $this->addText($dom, $detalle, 'sum:BaseImponibleOImporteNoSujeto', self::NS_SUM, $line['base']);
+            $this->addText($dom, $detalle, 'sum:BaseImponibleOimporteNoSujeto', self::NS_SUM, $line['base']);
             if ($line['cuota'] !== null) {
                 $this->addText($dom, $detalle, 'sum:CuotaRepercutida', self::NS_SUM, $line['cuota']);
             }
