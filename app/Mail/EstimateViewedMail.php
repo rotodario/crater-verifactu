@@ -30,7 +30,13 @@ class EstimateViewedMail extends Mailable
      */
     public function build()
     {
-        return $this->from(config('mail.from.address'), config('mail.from.name'))
+        $companyId = $this->data['company_id'] ?? null;
+        $mailService = app(\Crater\Services\CompanyMailService::class);
+
+        $from     = $companyId ? $mailService->getFromAddress($companyId) : config('mail.from.address');
+        $fromName = $companyId ? $mailService->getFromName($companyId)    : config('mail.from.name');
+
+        return $this->from($from, $fromName)
                     ->markdown('emails.viewed.estimate', ['data', $this->data]);
     }
 }

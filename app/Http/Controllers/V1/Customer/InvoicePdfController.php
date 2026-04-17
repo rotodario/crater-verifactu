@@ -28,14 +28,17 @@ class InvoicePdfController extends Controller
                 );
 
                 if ($notifyInvoiceViewed == 'YES') {
-                    $data['invoice'] = Invoice::findOrFail($invoice->id)->toArray();
-                    $data['user'] = Customer::find($invoice->customer_id)->toArray();
-                    $notificationEmail = CompanySetting::getSetting(
+                    $data['invoice']    = Invoice::findOrFail($invoice->id)->toArray();
+                    $data['user']       = Customer::find($invoice->customer_id)->toArray();
+                    $data['company_id'] = $invoice->company_id;
+                    $notificationEmail  = CompanySetting::getSetting(
                         'notification_email',
                         $invoice->company_id
                     );
+                    $mailer = app(\Crater\Services\CompanyMailService::class)
+                        ->resolveMailerName($invoice->company_id);
 
-                    \Mail::to($notificationEmail)->send(new InvoiceViewedMail($data));
+                    \Mail::mailer($mailer)->to($notificationEmail)->send(new InvoiceViewedMail($data));
                 }
             }
 

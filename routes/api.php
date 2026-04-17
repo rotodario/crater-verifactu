@@ -73,6 +73,9 @@ use Crater\Http\Controllers\V1\Admin\Settings\CompanyController;
 use Crater\Http\Controllers\V1\Admin\Settings\CompanyCurrencyCheckTransactionsController;
 use Crater\Http\Controllers\V1\Admin\Settings\DiskController;
 use Crater\Http\Controllers\V1\Admin\Settings\GetCompanyMailConfigurationController;
+use Crater\Http\Controllers\V1\Admin\Settings\GetCompanyMailSettingsController;
+use Crater\Http\Controllers\V1\Admin\Settings\UpdateCompanyMailSettingsController;
+use Crater\Http\Controllers\V1\Admin\Settings\TestCompanyMailController;
 use Crater\Http\Controllers\V1\Admin\Settings\GetCompanySettingsController;
 use Crater\Http\Controllers\V1\Admin\Settings\GetSettingsController;
 use Crater\Http\Controllers\V1\Admin\Settings\GetUserSettingsController;
@@ -443,6 +446,9 @@ Route::prefix('/v1')->group(function () {
             Route::post('/mail/test', [MailConfigurationController::class, 'testEmailConfig']);
 
             Route::get('/company/mail/config', GetCompanyMailConfigurationController::class);
+            Route::get('/company/mail/settings', GetCompanyMailSettingsController::class);
+            Route::post('/company/mail/settings', UpdateCompanyMailSettingsController::class);
+            Route::post('/company/mail/test', TestCompanyMailController::class);
 
             Route::apiResource('notes', NotesController::class);
 

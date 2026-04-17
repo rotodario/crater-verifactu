@@ -499,6 +499,7 @@ class Invoice extends Model implements HasMedia
         $data['subject'] = $this->getEmailString($data['subject']);
         $data['body'] = $this->getEmailString($data['body']);
         $data['attach']['data'] = ($this->getEmailAttachmentSetting()) ? $this->getPDFData() : null;
+        $data['from_name'] = app(\Crater\Services\CompanyMailService::class)->getFromName($this->company_id);
 
         return $data;
     }
@@ -523,7 +524,8 @@ class Invoice extends Model implements HasMedia
 
         $data = $this->sendInvoiceData($data);
 
-        \Mail::to($data['to'])->send(new SendInvoiceMail($data));
+        $mailer = app(\Crater\Services\CompanyMailService::class)->resolveMailerName($this->company_id);
+        \Mail::mailer($mailer)->to($data['to'])->send(new SendInvoiceMail($data));
 
         if ($this->status == Invoice::STATUS_DRAFT) {
             $this->status = Invoice::STATUS_SENT;

@@ -6,15 +6,14 @@ use Crater\Http\Controllers\Controller;
 use Crater\Services\CompanyMailService;
 use Illuminate\Http\Request;
 
-class GetCompanyMailConfigurationController extends Controller
+class GetCompanyMailSettingsController extends Controller
 {
     public function __invoke(Request $request, CompanyMailService $mailService)
     {
         $companyId = (int) $request->header('company');
 
         return response()->json([
-            'from_name' => $mailService->getFromName($companyId),
-            'from_mail' => $mailService->getFromAddress($companyId),
+            'mail_config' => $mailService->getSettings($companyId),
         ]);
     }
 }

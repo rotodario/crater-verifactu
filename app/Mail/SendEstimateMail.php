@@ -47,7 +47,7 @@ class SendEstimateMail extends Mailable
 
         $this->data['url'] = route('estimate', ['email_log' => $log->token]);
 
-        $mailContent = $this->from($this->data['from'], config('mail.from.name'))
+        $mailContent = $this->from($this->data['from'], $this->data['from_name'] ?? config('mail.from.name'))
                     ->subject($this->data['subject'])
                     ->markdown('emails.send.estimate', ['data', $this->data]);
 

@@ -350,6 +350,7 @@ class Estimate extends Model implements HasMedia
         $data['company'] = $this->company->toArray();
         $data['body'] = $this->getEmailBody($data['body']);
         $data['attach']['data'] = ($this->getEmailAttachmentSetting()) ? $this->getPDFData() : null;
+        $data['from_name'] = app(\Crater\Services\CompanyMailService::class)->getFromName($this->company_id);
 
         return $data;
     }
@@ -363,7 +364,8 @@ class Estimate extends Model implements HasMedia
             $this->save();
         }
 
-        \Mail::to($data['to'])->send(new SendEstimateMail($data));
+        $mailer = app(\Crater\Services\CompanyMailService::class)->resolveMailerName($this->company_id);
+        \Mail::mailer($mailer)->to($data['to'])->send(new SendEstimateMail($data));
 
         return [
             'success' => true,

@@ -246,6 +246,16 @@ return [
             'model' => ''
         ],
         [
+            'title' => 'settings.mail.company_mail_config',
+            'group' => '',
+            'name' => 'Company Mail',
+            'link' => '/admin/settings/company-mail-configuration',
+            'icon' => 'MailIcon',
+            'owner_only' => false,
+            'ability' => '',
+            'model' => ''
+        ],
+        [
             'title' => 'settings.menu_title.file_disk',
             'group' => '',
             'name' => 'File Disk',

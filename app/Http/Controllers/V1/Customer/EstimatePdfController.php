@@ -27,14 +27,17 @@ class EstimatePdfController extends Controller
                 );
 
                 if ($notifyEstimateViewed == 'YES') {
-                    $data['estimate'] = Estimate::findOrFail($estimate->id)->toArray();
-                    $data['user'] = Customer::find($estimate->customer_id)->toArray();
-                    $notificationEmail = CompanySetting::getSetting(
+                    $data['estimate']   = Estimate::findOrFail($estimate->id)->toArray();
+                    $data['user']       = Customer::find($estimate->customer_id)->toArray();
+                    $data['company_id'] = $estimate->company_id;
+                    $notificationEmail  = CompanySetting::getSetting(
                         'notification_email',
                         $estimate->company_id
                     );
+                    $mailer = app(\Crater\Services\CompanyMailService::class)
+                        ->resolveMailerName($estimate->company_id);
 
-                    \Mail::to($notificationEmail)->send(new EstimateViewedMail($data));
+                    \Mail::mailer($mailer)->to($notificationEmail)->send(new EstimateViewedMail($data));
                 }
             }
 

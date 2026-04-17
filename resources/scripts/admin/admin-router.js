@@ -49,6 +49,8 @@ const ExchangeRateSetting = () =>
   import('@/scripts/admin/views/settings/ExchangeRateProviderSetting.vue')
 const MailConfig = () =>
   import('@/scripts/admin/views/settings/MailConfigSetting.vue')
+const CompanyMailSetting = () =>
+  import('@/scripts/admin/views/settings/CompanyMailSetting.vue')
 const FileDisk = () =>
   import('@/scripts/admin/views/settings/FileDiskSetting.vue')
 const Backup = () => import('@/scripts/admin/views/settings/BackupSetting.vue')
@@ -328,6 +330,12 @@ export default [
             name: 'mailconfig',
             meta: { isOwner: true },
             component: MailConfig,
+          },
+          {
+            path: 'company-mail-configuration',
+            name: 'company-mailconfig',
+            meta: { isOwner: true },
+            component: CompanyMailSetting,
           },
           {
             path: 'file-disk',

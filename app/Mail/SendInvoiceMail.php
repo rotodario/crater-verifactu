@@ -47,7 +47,7 @@ class SendInvoiceMail extends Mailable
 
         $this->data['url'] = route('invoice', ['email_log' => $log->token]);
 
-        $mailContent = $this->from($this->data['from'], config('mail.from.name'))
+        $mailContent = $this->from($this->data['from'], $this->data['from_name'] ?? config('mail.from.name'))
             ->subject($this->data['subject'])
             ->markdown('emails.send.invoice', ['data', $this->data]);
 

@@ -127,6 +127,7 @@ class Payment extends Model implements HasMedia
         $data['company'] = Company::find($this->company_id);
         $data['body'] = $this->getEmailBody($data['body']);
         $data['attach']['data'] = ($this->getEmailAttachmentSetting()) ? $this->getPDFData() : null;
+        $data['from_name'] = app(\Crater\Services\CompanyMailService::class)->getFromName($this->company_id);
 
         return $data;
     }
@@ -135,7 +136,8 @@ class Payment extends Model implements HasMedia
     {
         $data = $this->sendPaymentData($data);
 
-        \Mail::to($data['to'])->send(new SendPaymentMail($data));
+        $mailer = app(\Crater\Services\CompanyMailService::class)->resolveMailerName($this->company_id);
+        \Mail::mailer($mailer)->to($data['to'])->send(new SendPaymentMail($data));
 
         return [
             'success' => true,
