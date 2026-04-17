@@ -398,8 +398,8 @@ return [
             'icon' => 'ShieldCheckIcon',
             'name' => 'VERI*FACTU',
             'owner_only' => false,
-            'ability' => 'view-invoice',
-            'model' => Invoice::class
+            'ability' => 'view-verifactu',
+            'model' => \Crater\Models\VerifactuRecord::class
         ],        [
             'title' => 'navigation.settings',
             'group' => 3,

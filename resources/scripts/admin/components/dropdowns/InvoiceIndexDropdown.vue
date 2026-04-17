@@ -182,6 +182,7 @@ function canReSendInvoice(row) {
 function canSendInvoice(row) {
   return (
     row.status == 'DRAFT' &&
+    !isFiscallyLocked(row) &&
     route.name !== 'invoices.view' &&
     userStore.hasAbilities(abilities.SEND_INVOICE)
   )

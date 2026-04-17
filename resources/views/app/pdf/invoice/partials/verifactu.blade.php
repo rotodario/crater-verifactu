@@ -1,28 +1,56 @@
 @if ($invoice->isFiscalIssued() && $invoice->verifactuRecord)
-    <div style="margin: 18px 30px 0 30px; page-break-inside: avoid;">
-        <table width="100%" style="border: 1px solid #D1D5DB; background: #F9FAFB;">
+    {{-- clear: both evita solapamiento con floats del contenido anterior --}}
+    <div style="clear: both;"></div>
+    <div style="margin: 32px 30px 0 30px; page-break-before: auto; page-break-inside: avoid;">
+        <table width="100%" style="border: 1px solid #D1D5DB; background: #F9FAFB; border-radius: 4px;">
             <tr>
-                <td style="padding: 10px 12px; vertical-align: top;">
-                    <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; color: #374151;">
-                        VERI*FACTU
+                {{-- Left column: fiscal metadata --}}
+                <td style="padding: 10px 14px; vertical-align: top;">
+                    <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; color: #374151; margin-bottom: 6px;">
+                        VERI*FACTU — Factura verificable
                     </div>
-                    <div style="font-size: 10px; color: #111827; margin-top: 5px;">
-                        Estado fiscal: <strong>{{ $invoice->fiscal_status }}</strong>
-                    </div>
-                    <div style="font-size: 10px; color: #111827; margin-top: 3px;">
-                        Expedida: <strong>{{ optional($invoice->fiscal_issued_at)->format('Y-m-d H:i:s') }}</strong>
-                    </div>
-                    <div style="font-size: 9px; color: #4B5563; margin-top: 6px; word-break: break-all;">
-                        Huella: {{ $invoice->verifactuRecord->hash }}
-                    </div>
+
+                    <table style="font-size: 9.5px; color: #111827; border-collapse: collapse;">
+                        <tr>
+                            <td style="color: #6B7280; padding-right: 6px; white-space: nowrap;">NIF emisor:</td>
+                            <td><strong>{{ optional($invoice->company)->tax_number }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td style="color: #6B7280; padding-right: 6px; white-space: nowrap;">Nº factura:</td>
+                            <td><strong>{{ $invoice->invoice_number }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td style="color: #6B7280; padding-right: 6px; white-space: nowrap;">Fecha:</td>
+                            <td><strong>{{ optional($invoice->invoice_date)->format('d-m-Y') }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td style="color: #6B7280; padding-right: 6px; white-space: nowrap;">Importe total:</td>
+                            <td><strong>{{ number_format($invoice->total / 100, 2, ',', '.') }} €</strong></td>
+                        </tr>
+                        <tr>
+                            <td style="color: #6B7280; padding-right: 6px; padding-top: 4px; white-space: nowrap; vertical-align: top;">Huella:</td>
+                            <td style="padding-top: 4px; font-size: 7.5px; word-break: break-all; line-height: 11px; color: #4B5563;">
+                                {{ $invoice->verifactuRecord->hash }}
+                            </td>
+                        </tr>
+                    </table>
                 </td>
-                <td style="padding: 10px 12px; vertical-align: top; width: 42%;">
-                    <div style="font-size: 9px; color: #4B5563; margin-bottom: 4px;">
-                        Payload QR preparado
-                    </div>
-                    <div style="font-size: 8px; color: #111827; word-break: break-all; line-height: 11px;">
-                        {{ $invoice->verifactu_qr_string }}
-                    </div>
+
+                {{-- Right column: QR code image --}}
+                <td style="padding: 10px 14px; vertical-align: middle; text-align: center; width: 140px;">
+                    @if (!empty($verifactu_qr_image))
+                        <img src="{{ $verifactu_qr_image }}"
+                             width="120" height="120"
+                             alt="QR VERI*FACTU"
+                             style="display: block; margin: 0 auto;" />
+                        <div style="font-size: 7px; color: #9CA3AF; margin-top: 4px; text-align: center;">
+                            Escanea para verificar
+                        </div>
+                    @else
+                        <div style="font-size: 8px; color: #9CA3AF; text-align: center;">
+                            QR no disponible
+                        </div>
+                    @endif
                 </td>
             </tr>
         </table>

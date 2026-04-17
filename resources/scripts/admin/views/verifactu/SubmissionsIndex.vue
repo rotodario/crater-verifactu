@@ -69,7 +69,7 @@
               <th class="py-3 pr-4 text-left text-gray-500">Cliente</th>
               <th class="py-3 pr-4 text-left text-gray-500">Estado</th>
               <th class="py-3 pr-4 text-left text-gray-500">Driver</th>
-              <th class="py-3 pr-4 text-left text-gray-500">Referencia</th>
+              <th class="py-3 pr-4 text-left text-gray-500">CSV</th>
               <th class="py-3 pr-4 text-left text-gray-500">Acciones</th>
               <th class="py-3 text-left text-gray-500">Fecha</th>
             </tr>
@@ -100,7 +100,7 @@
                 </BaseBadge>
               </td>
               <td class="py-3 pr-4">{{ submission.driver || '-' }}</td>
-              <td class="py-3 pr-4 font-mono text-xs text-gray-600">{{ submission.external_reference || '-' }}</td>
+              <td class="py-3 pr-4 font-mono text-xs text-green-700 font-semibold">{{ submission.csv || '-' }}</td>
               <td class="py-3 pr-4">
                 <BaseButton
                   v-if="submission.status === 'FAILED'"

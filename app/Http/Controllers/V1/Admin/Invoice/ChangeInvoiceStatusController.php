@@ -13,6 +13,10 @@ class ChangeInvoiceStatusController extends Controller
     {
         $this->authorize('send invoice', $invoice);
 
+        if ($invoice->fiscal_status === Invoice::FISCAL_STATUS_ANNULLED) {
+            return respondJson('invoice_fiscally_annulled', 'Annulled invoices cannot change status.');
+        }
+
         if ($request->status == Invoice::STATUS_SENT) {
             $verifactuService->ensureIssued($invoice, [
                 'trigger' => 'manual_mark_as_sent',

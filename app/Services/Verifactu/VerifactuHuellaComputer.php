@@ -75,6 +75,33 @@ class VerifactuHuellaComputer
     }
 
     /**
+     * Compute the Huella for a RegistroBaja (cancellation record).
+     *
+     * The baja formula omits TipoFactura, CuotaTotal and ImporteTotal
+     * (financial fields are not part of a cancellation's hash chain):
+     *
+     *   IDEmisorFactura={nif}&NumSerieFactura={num}&FechaExpedicionFactura={date}
+     *   &Huella={previous_or_empty}&FechaHoraHusoGenRegistro={timestamp}
+     */
+    public function computeBaja(
+        string  $issuerNif,
+        string  $invoiceNumber,
+        string  $invoiceDate,       // dd-mm-yyyy
+        ?string $previousHuella,
+        string  $fechaHoraHuso
+    ): string {
+        $input = implode('&', [
+            "IDEmisorFactura={$issuerNif}",
+            "NumSerieFactura={$invoiceNumber}",
+            "FechaExpedicionFactura={$invoiceDate}",
+            'Huella=' . ($previousHuella ?? ''),
+            "FechaHoraHusoGenRegistro={$fechaHoraHuso}",
+        ]);
+
+        return strtoupper(hash('sha256', $input));
+    }
+
+    /**
      * Determine the VERI*FACTU TipoFactura code from invoice data.
      *
      * F1 — Full invoice (factura completa)

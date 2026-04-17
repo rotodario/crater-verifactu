@@ -14,6 +14,7 @@
     "crater-invoice/modules": "^1.0.0",
     "doctrine/dbal": "^2.10",
     "dragonmantank/cron-expression": "^3.1",
+    "endroid/qr-code": "^5.1",
     "fideloper/proxy": "^4.0",
     "fruitcake/laravel-cors": "^1.0",
     "guzzlehttp/guzzle": "^7.0.1",

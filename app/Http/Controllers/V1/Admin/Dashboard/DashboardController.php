@@ -26,7 +26,7 @@ class DashboardController extends Controller
     protected function getFiscalDateRange($fiscalStartMonth, $startYear)
     {
         $startDate = Carbon::create($startYear, $fiscalStartMonth, 1)->startOfMonth();
-        $endDate = (clone $startDate)->addMonth()->endOfMonth();
+        $endDate = (clone $startDate)->endOfMonth();
 
         return [$startDate, clone $startDate, $endDate];
     }

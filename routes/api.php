@@ -42,6 +42,7 @@ use Crater\Http\Controllers\V1\Admin\General\TimezonesController;
 use Crater\Http\Controllers\V1\Admin\Invoice\ChangeInvoiceStatusController;
 use Crater\Http\Controllers\V1\Admin\Invoice\CloneInvoiceController;
 use Crater\Http\Controllers\V1\Admin\Invoice\CreateRectificativeInvoiceController;
+use Crater\Http\Controllers\V1\Admin\Invoice\AnnulInvoiceController;
 use Crater\Http\Controllers\V1\Admin\Invoice\IssueInvoiceController;
 use Crater\Http\Controllers\V1\Admin\Invoice\InvoicesController;
 use Crater\Http\Controllers\V1\Admin\Invoice\InvoiceTemplatesController;
@@ -299,6 +300,7 @@ Route::prefix('/v1')->group(function () {
             Route::post('/invoices/{invoice}/status', ChangeInvoiceStatusController::class);
 
             Route::post('/invoices/{invoice}/issue', IssueInvoiceController::class);
+            Route::post('/invoices/{invoice}/annul', AnnulInvoiceController::class);
 
             Route::post('/invoices/delete', [InvoicesController::class, 'delete']);
 

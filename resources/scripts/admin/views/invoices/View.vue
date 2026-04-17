@@ -28,6 +28,7 @@ const router = useRouter()
 const isMarkAsSent = ref(false)
 const isLoading = ref(false)
 const isIssuing = ref(false)
+const isAnnulling = ref(false)
 
 const invoiceList = ref(null)
 const currentPageNumber = ref(1)
@@ -76,6 +77,14 @@ const canIssueFiscally = computed(() => {
     invoiceData.value.fiscal_status === 'NOT_ISSUED'
   )
 })
+
+const canAnnulFiscally = computed(() => {
+  return (
+    invoiceData.value &&
+    userStore.hasAbilities(abilities.MANAGE_VERIFACTU) &&
+    ['ISSUED', 'SUBMITTED', 'ACCEPTED'].includes(invoiceData.value.fiscal_status)
+  )
+})
 function getFiscalBadgeColor(status) {
   switch (status) {
     case 'ACCEPTED':
@@ -85,6 +94,8 @@ function getFiscalBadgeColor(status) {
       return { bgColor: '#C9E3EC', color: '#2C5282' }
     case 'REJECTED':
       return { bgColor: '#FED7D7', color: '#C53030' }
+    case 'ANNULLED':
+      return { bgColor: '#E2E8F0', color: '#718096' }
     default:
       return { bgColor: '#F8EDCB', color: '#744210' }
   }
@@ -161,6 +172,30 @@ async function onIssueFiscally() {
           invoiceData.value = { ...invoiceData.value, ...result.data.data }
         } finally {
           isIssuing.value = false
+        }
+      }
+    })
+}
+
+async function onAnnulFiscally() {
+  dialogStore
+    .openDialog({
+      title: t('general.are_you_sure'),
+      message: 'Se anulará fiscalmente esta factura mediante un RegistroBaja ante la AEAT. Esta acción no se puede deshacer.',
+      yesLabel: 'Anular',
+      noLabel: t('general.cancel'),
+      variant: 'danger',
+      hideNoButton: false,
+      size: 'lg',
+    })
+    .then(async (response) => {
+      if (response) {
+        isAnnulling.value = true
+        try {
+          const result = await invoiceStore.annulFiscally({ id: invoiceData.value.id })
+          invoiceData.value = { ...invoiceData.value, ...result.data.data }
+        } finally {
+          isAnnulling.value = false
         }
       }
     })
@@ -320,6 +355,7 @@ onSearched = debounce(onSearched, 500)
           <BaseButton
             v-if="
               invoiceData.status === 'DRAFT' &&
+              invoiceData.fiscal_status !== 'ANNULLED' &&
               userStore.hasAbilities(abilities.EDIT_INVOICE)
             "
             :disabled="isMarkAsSent"
@@ -333,6 +369,7 @@ onSearched = debounce(onSearched, 500)
         <BaseButton
           v-if="
             invoiceData.status === 'DRAFT' &&
+            invoiceData.fiscal_status !== 'ANNULLED' &&
             userStore.hasAbilities(abilities.SEND_INVOICE)
           "
           variant="primary"
@@ -350,6 +387,16 @@ onSearched = debounce(onSearched, 500)
           @click="onIssueFiscally"
         >
           {{ isIssuing ? 'Expidiendo...' : 'Expedir fiscalmente' }}
+        </BaseButton>
+
+        <BaseButton
+          v-if="canAnnulFiscally"
+          variant="danger-outline"
+          class="ml-3 text-sm"
+          :disabled="isAnnulling"
+          @click="onAnnulFiscally"
+        >
+          {{ isAnnulling ? 'Anulando...' : 'Anular fiscalmente' }}
         </BaseButton>
 
         <div v-if="invoiceData" class="ml-3 flex items-center gap-2">

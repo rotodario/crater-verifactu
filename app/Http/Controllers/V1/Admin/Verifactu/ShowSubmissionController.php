@@ -36,8 +36,11 @@ class ShowSubmissionController extends Controller
                 'completed_at' => optional($submission->completed_at)->toDateTimeString(),
                 'created_at' => optional($submission->created_at)->toDateTimeString(),
                 'updated_at' => optional($submission->updated_at)->toDateTimeString(),
-                'request_payload' => $submission->request_payload,
+                'csv'              => $submission->csv,
+                'request_payload'  => $submission->request_payload,
                 'response_payload' => $submission->response_payload,
+                'request_xml'      => $submission->request_xml,
+                'response_xml'     => $submission->response_xml,
                 'record' => $submission->record ? [
                     'id' => $submission->record->id,
                     'status' => $submission->record->status,

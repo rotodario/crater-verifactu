@@ -23,6 +23,15 @@ class VerifactuXmlBuilder
 
     public function build(VerifactuRecord $record): string
     {
+        if ($record->record_type === 'invoice_cancellation') {
+            return $this->buildBaja($record);
+        }
+
+        return $this->buildAlta($record);
+    }
+
+    public function buildAlta(VerifactuRecord $record): string
+    {
         $record->loadMissing(['installation']);
 
         $snap        = $record->snapshot;
@@ -274,6 +283,112 @@ class VerifactuXmlBuilder
         $el = $dom->createElementNS($ns, $tagNs);
         $el->appendChild($dom->createTextNode((string) ($value ?? '')));
         $parent->appendChild($el);
+    }
+
+    /**
+     * Build a RegistroBaja (cancellation) SOAP envelope.
+     *
+     * Much simpler than RegistroAlta: no tax breakdown, no recipient,
+     * just the identifying fields + software block + hash chain.
+     */
+    public function buildBaja(VerifactuRecord $record): string
+    {
+        $record->loadMissing(['installation']);
+
+        $snap        = $record->snapshot;
+        $invoice     = $snap['invoice'];
+        $company     = $snap['company'];
+        $software    = $snap['software'];
+        $installation = $record->installation;
+
+        $issuedAt = $record->issued_at;
+
+        $dom = new DOMDocument('1.0', 'UTF-8');
+        $dom->formatOutput = true;
+
+        $envelope = $dom->createElementNS(self::NS_SOAP, 'soapenv:Envelope');
+        $envelope->setAttribute('xmlns:sum',  self::NS_SUM);
+        $envelope->setAttribute('xmlns:sum1', self::NS_SUM1);
+        $dom->appendChild($envelope);
+
+        $envelope->appendChild($dom->createElementNS(self::NS_SOAP, 'soapenv:Header'));
+
+        $body = $dom->createElementNS(self::NS_SOAP, 'soapenv:Body');
+        $envelope->appendChild($body);
+
+        $root = $dom->createElementNS(self::NS_SUM1, 'sum1:SuministroLRFacturasEmitidas');
+        $body->appendChild($root);
+
+        // Cabecera
+        $cabecera = $dom->createElementNS(self::NS_SUM, 'sum:Cabecera');
+        $root->appendChild($cabecera);
+        $obligado = $dom->createElementNS(self::NS_SUM, 'sum:ObligadoEmision');
+        $cabecera->appendChild($obligado);
+        $this->addText($dom, $obligado, 'sum:NombreRazon', self::NS_SUM, $company['name']);
+        $this->addText($dom, $obligado, 'sum:NIF',         self::NS_SUM, $company['tax_number'] ?? '');
+
+        // RegistroFactura > RegistroBaja
+        $registroFactura = $dom->createElementNS(self::NS_SUM1, 'sum1:RegistroFactura');
+        $root->appendChild($registroFactura);
+
+        $baja = $dom->createElementNS(self::NS_SUM1, 'sum1:RegistroBaja');
+        $registroFactura->appendChild($baja);
+
+        $this->addText($dom, $baja, 'sum1:IDVersion', self::NS_SUM1, '1.0');
+
+        $idFactura = $dom->createElementNS(self::NS_SUM1, 'sum1:IDFactura');
+        $baja->appendChild($idFactura);
+        $this->addText($dom, $idFactura, 'sum1:IDEmisorFacturaEmisor',        self::NS_SUM1, $company['tax_number'] ?? '');
+        $this->addText($dom, $idFactura, 'sum1:NumSerieFactura',              self::NS_SUM1, $invoice['number']);
+        $this->addText($dom, $idFactura, 'sum1:FechaExpedicionFacturaEmisor', self::NS_SUM1,
+            VerifactuHuellaComputer::formatInvoiceDate(\Carbon\Carbon::parse($invoice['date']))
+        );
+
+        $this->addText($dom, $baja, 'sum1:NombreRazonEmisorFactura', self::NS_SUM1, $company['name']);
+
+        // SistemaInformatico
+        $si = $dom->createElementNS(self::NS_SUM1, 'sum1:SistemaInformatico');
+        $baja->appendChild($si);
+        $this->addText($dom, $si, 'sum1:NombreRazon',              self::NS_SUM1, $software['vendor_name'] ?? config('verifactu.software.vendor_name'));
+        $this->addText($dom, $si, 'sum1:NIF',                      self::NS_SUM1, $software['vendor_tax_id'] ?? config('verifactu.software.vendor_tax_id'));
+        $this->addText($dom, $si, 'sum1:NombreSistemaInformatico', self::NS_SUM1, $software['name']);
+        $this->addText($dom, $si, 'sum1:IdSistemaInformatico',     self::NS_SUM1, config('verifactu.software.id', 'CRATER-VF'));
+        $this->addText($dom, $si, 'sum1:Version',                  self::NS_SUM1, $software['version']);
+        $this->addText($dom, $si, 'sum1:NumeroInstalacion',        self::NS_SUM1,
+            optional($installation)->installation_number ?: config('verifactu.software.installation_number', '1')
+        );
+        $mode   = optional($installation)->mode ?: config('verifactu.mode', 'stub');
+        $usoCod = ($mode === 'aeat_production') ? '01' : '02';
+        $this->addText($dom, $si, 'sum1:TipoUsoCodSistemaInformatico', self::NS_SUM1, $usoCod);
+
+        // Timestamp + Huella
+        $this->addText($dom, $baja, 'sum1:FechaHoraHusoGenRegistro', self::NS_SUM1,
+            VerifactuHuellaComputer::formatTimestamp($issuedAt)
+        );
+        $this->addText($dom, $baja, 'sum1:TipoHuella', self::NS_SUM1, '01');
+        $this->addText($dom, $baja, 'sum1:Huella',     self::NS_SUM1, $record->hash);
+
+        // Encadenamiento
+        $encadenamiento = $dom->createElementNS(self::NS_SUM1, 'sum1:Encadenamiento');
+        $baja->appendChild($encadenamiento);
+
+        if (! $record->previous_hash) {
+            $this->addText($dom, $encadenamiento, 'sum1:PrimerRegistro', self::NS_SUM1, 'S');
+        } else {
+            $prev = \Crater\Models\VerifactuRecord::where('hash', $record->previous_hash)->first();
+            $regAnterior = $dom->createElementNS(self::NS_SUM1, 'sum1:RegistroAnterior');
+            $encadenamiento->appendChild($regAnterior);
+            $this->addText($dom, $regAnterior, 'sum1:IDEmisorFactura',        self::NS_SUM1, $company['tax_number'] ?? '');
+            $this->addText($dom, $regAnterior, 'sum1:NumSerieFactura',        self::NS_SUM1, optional($prev)->invoice_number ?? '');
+            $this->addText($dom, $regAnterior, 'sum1:FechaExpedicionFactura', self::NS_SUM1,
+                $prev && $prev->invoice_date
+                    ? VerifactuHuellaComputer::formatInvoiceDate(\Carbon\Carbon::parse($prev->invoice_date))
+                    : ''
+            );
+            $this->addText($dom, $regAnterior, 'sum1:Huella', self::NS_SUM1, $record->previous_hash);
+        }
+
+        return $dom->saveXML();
     }
 
     /**

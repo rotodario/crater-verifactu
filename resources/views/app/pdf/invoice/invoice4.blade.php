@@ -405,8 +405,8 @@
             @endif
         </div>
 
-        @include('app.pdf.invoice.partials.verifactu')
     </div>
+    @include('app.pdf.invoice.partials.verifactu')
 </body>
 
 </html>

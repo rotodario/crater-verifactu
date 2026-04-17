@@ -19,4 +19,12 @@ class VerifactuStateManager
 
         return $invoice;
     }
+
+    public function markAnnulled(Invoice $invoice)
+    {
+        $invoice->fiscal_status = Invoice::FISCAL_STATUS_ANNULLED;
+        $invoice->save();
+
+        return $invoice;
+    }
 }

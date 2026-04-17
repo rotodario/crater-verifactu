@@ -40,6 +40,7 @@ class Invoice extends Model implements HasMedia
     public const FISCAL_STATUS_SUBMITTED = 'SUBMITTED';
     public const FISCAL_STATUS_ACCEPTED = 'ACCEPTED';
     public const FISCAL_STATUS_REJECTED = 'REJECTED';
+    public const FISCAL_STATUS_ANNULLED = 'ANNULLED';
 
     protected $dates = [
         'created_at',
@@ -142,13 +143,16 @@ class Invoice extends Model implements HasMedia
         return url('/invoices/pdf/'.$this->unique_hash);
     }
 
-    public function getVerifactuQrStringAttribute()
+    public function getVerifactuQrStringAttribute(): ?string
     {
-        if (! $this->verifactuRecord || ! $this->verifactuRecord->qr_payload) {
+        if (! $this->verifactuRecord) {
             return null;
         }
 
-        return app(VerifactuQrService::class)->buildDisplayString($this->verifactuRecord->qr_payload);
+        $svc     = app(VerifactuQrService::class);
+        $payload = $svc->buildPayload($this, $this->verifactuRecord);
+
+        return $svc->buildDisplayString($payload);
     }
 
     public function getPaymentModuleEnabledAttribute()
@@ -624,6 +628,14 @@ class Invoice extends Model implements HasMedia
 
         $logo = $company->logo_path;
 
+        // Generate VERI*FACTU QR image for PDF if the invoice is fiscally issued
+        $verifactuQrImage = null;
+        if ($this->verifactuRecord) {
+            $this->loadMissing('verifactuRecord');
+            $verifactuQrImage = app(VerifactuQrService::class)
+                ->buildQrDataUri($this, $this->verifactuRecord);
+        }
+
         view()->share([
             'invoice' => $this,
             'customFields' => $customFields,
@@ -633,6 +645,7 @@ class Invoice extends Model implements HasMedia
             'notes' => $this->getNotes(),
             'logo' => $logo ?? null,
             'taxes' => $taxes,
+            'verifactu_qr_image' => $verifactuQrImage,
         ]);
 
         if (request()->has('preview')) {

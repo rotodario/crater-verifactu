@@ -361,6 +361,24 @@ export const useInvoiceStore = (useWindow = false) => {
         })
       },
 
+      annulFiscally(data) {
+        return new Promise((resolve, reject) => {
+          axios
+            .post(`/api/v1/invoices/${data.id}/annul`)
+            .then((response) => {
+              notificationStore.showNotification({
+                type: 'success',
+                message: 'Factura anulada fiscalmente.',
+              })
+              resolve(response)
+            })
+            .catch((err) => {
+              handleError(err)
+              reject(err)
+            })
+        })
+      },
+
       getNextNumber(params, setState = false) {
         return new Promise((resolve, reject) => {
           const key = params?.key || 'invoice'

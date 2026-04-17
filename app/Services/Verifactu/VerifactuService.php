@@ -93,4 +93,71 @@ class VerifactuService
 
         return $record;
     }
+
+    public function annulInvoice(Invoice $invoice, array $context = [])
+    {
+        if ($this->driverManager->isOff()) {
+            return null;
+        }
+
+        if (! $invoice->isFiscalIssued()) {
+            throw new \RuntimeException('La factura no está expedida fiscalmente y no puede anularse.');
+        }
+
+        if ($invoice->fiscal_status === Invoice::FISCAL_STATUS_ANNULLED) {
+            throw new \RuntimeException('La factura ya está anulada fiscalmente.');
+        }
+
+        $installation = $this->resolver->resolveForCompany($invoice->company_id);
+
+        // Build a cancellation record using the same snapshot as the original
+        $originalRecord = $invoice->verifactuRecord;
+        $issuedAt       = \Carbon\Carbon::now();
+
+        $previousRecord = \Crater\Models\VerifactuRecord::where('company_id', $invoice->company_id)
+            ->latest('id')
+            ->first();
+
+        $huellaComputer = new VerifactuHuellaComputer();
+        $huella = $huellaComputer->computeBaja(
+            issuerNif:      $invoice->company->tax_number ?? '',
+            invoiceNumber:  $invoice->invoice_number,
+            invoiceDate:    VerifactuHuellaComputer::formatInvoiceDate(
+                                $invoice->invoice_date ?? $issuedAt
+                            ),
+            previousHuella: optional($previousRecord)->hash,
+            fechaHoraHuso:  VerifactuHuellaComputer::formatTimestamp($issuedAt),
+        );
+
+        $record = \Crater\Models\VerifactuRecord::create([
+            'company_id'               => $invoice->company_id,
+            'invoice_id'               => $invoice->id,
+            'verifactu_installation_id' => $installation->id,
+            'record_type'              => 'invoice_cancellation',
+            'status'                   => 'ISSUED',
+            'invoice_number'           => $invoice->invoice_number,
+            'invoice_date'             => optional($invoice->invoice_date)->format('Y-m-d'),
+            'invoice_uid'              => implode('-', [$invoice->company_id, $invoice->invoice_number, $issuedAt->format('YmdHis'), 'BAJA']),
+            'tipo_factura'             => $originalRecord->tipo_factura ?? 'F1',
+            'hash'                     => $huella,
+            'previous_hash'            => optional($previousRecord)->hash,
+            'issued_at'                => $issuedAt,
+            'locked_at'                => $issuedAt,
+            'snapshot'                 => $originalRecord ? $originalRecord->snapshot : [],
+            'metadata'                 => ['cancellation_of_record_id' => optional($originalRecord)->id],
+        ]);
+
+        $this->stateManager->markAnnulled($invoice);
+        $this->submissionService->queueSubmission($record);
+
+        $this->eventLogger->log(
+            'invoice_annulled',
+            $invoice,
+            $record,
+            $context,
+            'Invoice fiscally annulled. RegistroBaja created and queued.'
+        );
+
+        return $record;
+    }
 }
