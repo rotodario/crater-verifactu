@@ -14,17 +14,25 @@ class CreateDeclarationController extends Controller
     {
         $this->authorize('managePlatform', VerifactuRecord::class);
 
-        $companyId = (int) $request->header('company');
-
-        // Require platform config to be complete before allowing declaration creation
         $platform = VerifactuPlatformConfig::current();
-        if (! $platform->software_id || ! $platform->vendor_tax_id) {
+
+        // Platform config must be persisted and contain the minimum required fields
+        if (
+            ! $platform->exists
+            || ! $platform->software_id
+            || ! $platform->vendor_tax_id
+            || ! $platform->software_version
+        ) {
             return response()->json([
-                'message' => 'Completa primero la Configuración de Plataforma SIF (IdSistemaInformatico y NIF del desarrollador son obligatorios).',
+                'message' => 'Completa y guarda primero la Configuración de Plataforma SIF (IdSistemaInformatico, versión y NIF del productor son obligatorios).',
             ], 422);
         }
 
-        $declaration = $service->createDraft($companyId);
+        try {
+            $declaration = $service->createDraft();
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
+        }
 
         return response()->json([
             'declaration' => $this->format($declaration),
@@ -39,7 +47,11 @@ class CreateDeclarationController extends Controller
             'software_version'    => $d->software_version,
             'status'              => $d->status,
             'declaration_payload' => $d->declaration_payload,
-            'declared_at'         => optional($d->declared_at)->toDateTimeString(),
+            'notes'               => $d->notes,
+            'generated_at'        => optional($d->generated_at)->toDateTimeString(),
+            'reviewed_at'         => optional($d->reviewed_at)->toDateTimeString(),
+            'activated_at'        => optional($d->activated_at)->toDateTimeString(),
+            'archived_at'         => optional($d->archived_at)->toDateTimeString(),
             'created_at'          => optional($d->created_at)->toDateTimeString(),
             'updated_at'          => optional($d->updated_at)->toDateTimeString(),
         ];

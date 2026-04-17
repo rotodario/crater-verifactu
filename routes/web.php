@@ -13,6 +13,7 @@ use Crater\Http\Controllers\V1\Customer\InvoicePdfController as CustomerInvoiceP
 use Crater\Http\Controllers\V1\Customer\PaymentPdfController as CustomerPaymentPdfController;
 use Crater\Http\Controllers\V1\Modules\ScriptController;
 use Crater\Http\Controllers\V1\Modules\StyleController;
+use Crater\Http\Controllers\V1\Admin\Verifactu\DeclarationPdfController;
 use Crater\Http\Controllers\V1\PDF\DownloadReceiptController;
 use Crater\Http\Controllers\V1\PDF\EstimatePdfController;
 use Crater\Http\Controllers\V1\PDF\InvoicePdfController;
@@ -45,6 +46,15 @@ Route::post('/{company:slug}/customer/login', CustomerLoginController::class);
 
 Route::post('/{company:slug}/customer/logout', function () {
     Auth::guard('customer')->logout();
+});
+
+
+// Verifactu Declaration PDF
+// ----------------------------------------------
+
+Route::middleware('auth')->prefix('verifactu')->group(function () {
+    Route::get('/declarations/{declaration}/pdf', DeclarationPdfController::class)
+        ->name('verifactu.declarations.pdf');
 });
 
 

@@ -13,11 +13,22 @@ class VerifactuDeclaration extends Model
 
     protected $casts = [
         'declaration_payload' => 'array',
-        'declared_at' => 'datetime',
+        'generated_at'        => 'datetime',
+        'reviewed_at'         => 'datetime',
+        'activated_at'        => 'datetime',
+        'archived_at'         => 'datetime',
     ];
 
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    /**
+     * Returns true if this declaration is the current active one for the SIF.
+     */
+    public function isActive(): bool
+    {
+        return $this->status === 'ACTIVE';
     }
 }

@@ -94,7 +94,7 @@
               </div>
               <div class="flex justify-between">
                 <dt class="text-gray-500">Software</dt>
-                <dd class="text-gray-600 font-mono text-xs">{{ installation.software_name || '—' }} {{ installation.software_version || '' }}</dd>
+                <dd class="text-gray-600 font-mono text-xs">{{ platform?.software_name || '—' }} {{ platform?.software_version || '' }}</dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-gray-500">Actualizado</dt>
@@ -175,8 +175,8 @@
             <div>
               <p class="font-semibold">Configuración global — compartida por todas las empresas</p>
               <p class="mt-1">
-                El <strong>IdSistemaInformatico</strong> identifica el software ante la AEAT en cada envío de factura.
-                Es único para toda la plataforma y lo obtienes al presentar la Declaración Responsable.
+                El <strong>IdSistemaInformatico</strong> identifica el software en cada envío de factura a la AEAT.
+                Es único para toda la plataforma y queda incorporado al sistema mediante la Declaración Responsable del SIF.
                 Cada empresa firma con su propio certificado pero comparte este identificador de software.
               </p>
             </div>
@@ -254,7 +254,7 @@
             <fieldset class="border border-gray-200 rounded-lg p-4">
               <legend class="px-2 text-sm font-medium text-gray-700">Registro AEAT</legend>
               <p class="mt-1 mb-4 text-xs text-gray-500">
-                El <strong>IdSistemaInformatico</strong> se obtiene al presentar la Declaración Responsable ante la AEAT.
+                El <strong>IdSistemaInformatico</strong> identifica esta versión certificada del SIF dentro del sistema.
                 Puedes usar cualquier identificador durante desarrollo (modo <span class="font-mono">shadow</span>).
                 Es obligatorio para los modos <span class="font-mono">aeat_sandbox</span> y <span class="font-mono">aeat_production</span>.
               </p>
@@ -273,6 +273,47 @@
                     :invalid="!!platformErrors.software_id"
                   />
                 </BaseInputGroup>
+              </div>
+            </fieldset>
+
+            <!-- Optional fields for the Declaración Responsable PDF -->
+            <fieldset class="border border-gray-200 rounded-lg p-4">
+              <legend class="px-2 text-sm font-medium text-gray-700">
+                Datos para la Declaración Responsable
+                <span class="ml-1 text-xs font-normal text-gray-400">(opcional — necesarios para generar el PDF completo)</span>
+              </legend>
+              <div class="mt-3 space-y-4">
+                <BaseInputGroup label="Domicilio fiscal del productor">
+                  <BaseInput
+                    v-model="platformForm.vendor_address"
+                    :disabled="!canManagePlatform"
+                    type="text"
+                    placeholder="Calle Ejemplo 1, 28001 Madrid"
+                  />
+                </BaseInputGroup>
+
+                <BaseInputGroup label="Lugar de suscripción de la declaración">
+                  <BaseInput
+                    v-model="platformForm.subscription_place"
+                    :disabled="!canManagePlatform"
+                    type="text"
+                    placeholder="Madrid"
+                  />
+                </BaseInputGroup>
+
+                <div>
+                  <label class="block mb-1 text-sm font-medium text-gray-700">
+                    Descripción del sistema y funcionalidades
+                    <span class="ml-1 text-xs font-normal text-gray-400">(1.g del documento)</span>
+                  </label>
+                  <textarea
+                    v-model="platformForm.vendor_description"
+                    :disabled="!canManagePlatform"
+                    rows="4"
+                    placeholder="Si se deja en blanco se usará el texto por defecto en el PDF."
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:text-gray-500"
+                  />
+                </div>
               </div>
             </fieldset>
 
@@ -575,12 +616,12 @@
         <div class="flex items-start gap-3 p-4 mb-5 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800">
           <BaseIcon name="InformationCircleIcon" class="h-5 w-5 shrink-0 mt-0.5 text-blue-500" />
           <div>
-            <p class="font-semibold">¿Qué es la Declaración Responsable?</p>
+            <p class="font-semibold">¿Qué es la Declaración Responsable del SIF?</p>
             <p class="mt-1">
-              Antes de usar VERI*FACTU en producción debes declarar el software ante la AEAT.
-              Genera el borrador aquí, revisa los datos y preséntalo en la
-              <strong>Sede Electrónica de la AEAT</strong> con tu certificado digital de desarrollador.
-              Una vez aceptado, marca la declaración como presentada y luego como aceptada.
+              El productor certifica esta versión del SIF y la declaración queda
+              incorporada y accesible dentro del propio sistema.
+              Crea un borrador, revisa los datos y actívala como la declaración vigente
+              para la versión actual del software.
             </p>
           </div>
         </div>
@@ -630,7 +671,28 @@
                     {{ declarationStatusLabel(dec.status) }}
                   </span>
                 </div>
-                <span class="text-xs text-gray-400">Creada {{ dec.created_at }}</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-gray-400">Creada {{ dec.created_at }}</span>
+                  <!-- PDF available from GENERATED onwards; shown as disabled in DRAFT -->
+                  <a
+                    v-if="['GENERATED','REVIEWED','ACTIVE','ARCHIVED'].includes(dec.status)"
+                    :href="`/verifactu/declarations/${dec.id}/pdf`"
+                    target="_blank"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded hover:bg-primary-100 transition-colors"
+                    title="Ver / descargar PDF de la declaración"
+                  >
+                    <BaseIcon name="DocumentTextIcon" class="h-3.5 w-3.5" />
+                    PDF
+                  </a>
+                  <span
+                    v-else
+                    class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-gray-400 bg-gray-50 border border-gray-200 rounded cursor-not-allowed"
+                    title="Genera la declaración primero para obtener el PDF"
+                  >
+                    <BaseIcon name="DocumentTextIcon" class="h-3.5 w-3.5" />
+                    PDF
+                  </span>
+                </div>
               </div>
             </template>
 
@@ -656,81 +718,94 @@
                 <p class="text-xs text-gray-400 mb-0.5">NIF del desarrollador</p>
                 <p class="font-mono text-gray-800">{{ dec.declaration_payload?.vendor_tax_id || '—' }}</p>
               </div>
-              <div v-if="dec.declared_at">
-                <p class="text-xs text-gray-400 mb-0.5">Presentada el</p>
-                <p class="text-gray-800">{{ dec.declared_at }}</p>
+              <div v-if="dec.activated_at">
+                <p class="text-xs text-gray-400 mb-0.5">Vigente desde</p>
+                <p class="text-gray-800">{{ dec.activated_at }}</p>
               </div>
             </div>
 
             <!-- Notes -->
-            <div v-if="dec.declaration_payload?.notes" class="mb-4 p-3 bg-gray-50 rounded-md border border-gray-100 text-sm text-gray-600">
-              <span class="font-medium">Notas:</span> {{ dec.declaration_payload.notes }}
+            <div v-if="dec.notes" class="mb-4 p-3 bg-gray-50 rounded-md border border-gray-100 text-sm text-gray-600">
+              <span class="font-medium">Notas:</span> {{ dec.notes }}
             </div>
 
             <!-- Action buttons per status -->
-            <div v-if="canManagePlatform" class="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
+            <div v-if="canManagePlatform" class="pt-3 border-t border-gray-100">
 
-              <!-- DRAFT → SUBMITTED -->
-              <template v-if="dec.status === 'DRAFT'">
-                <div class="flex items-center gap-2 flex-wrap w-full">
-                  <input
-                    v-model="declarationNotes[dec.id]"
-                    type="text"
-                    class="flex-1 min-w-48 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    placeholder="Referencia AEAT o notas (opcional)"
-                  />
-                  <BaseButton
-                    variant="primary"
-                    size="sm"
-                    :loading="updatingDeclaration[dec.id]"
-                    @click="onUpdateDeclaration(dec, 'SUBMITTED')"
-                  >
-                    Marcar como presentada
-                  </BaseButton>
-                </div>
-                <p class="text-xs text-gray-400 w-full">
-                  Presenta primero la declaración en la Sede Electrónica de la AEAT y luego marca como presentada.
-                </p>
-              </template>
+              <!-- Notes input (shown when a transition is available) -->
+              <div v-if="['DRAFT','GENERATED','REVIEWED'].includes(dec.status)"
+                class="flex items-center gap-2 flex-wrap mb-3">
+                <input
+                  v-model="declarationNotes[dec.id]"
+                  type="text"
+                  class="flex-1 min-w-48 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="Notas internas (opcional)"
+                />
+              </div>
 
-              <!-- SUBMITTED → ACCEPTED or REJECTED -->
-              <template v-if="dec.status === 'SUBMITTED'">
+              <!-- DRAFT → GENERATED -->
+              <div v-if="dec.status === 'DRAFT'" class="flex flex-wrap gap-2">
                 <BaseButton
                   variant="primary"
                   size="sm"
-                  :loading="updatingDeclaration[dec.id] === 'ACCEPTED'"
-                  @click="onUpdateDeclaration(dec, 'ACCEPTED')"
+                  :loading="updatingDeclaration[dec.id] === 'GENERATED'"
+                  @click="onUpdateDeclaration(dec, 'GENERATED')"
                 >
-                  Marcar como aceptada
+                  Generar declaración
                 </BaseButton>
-                <BaseButton
-                  variant="danger-outline"
-                  size="sm"
-                  :loading="updatingDeclaration[dec.id] === 'REJECTED'"
-                  @click="onUpdateDeclaration(dec, 'REJECTED')"
-                >
-                  Marcar como rechazada
-                </BaseButton>
-              </template>
+              </div>
 
-              <!-- REJECTED → DRAFT (re-draft) -->
-              <template v-if="dec.status === 'REJECTED'">
+              <!-- GENERATED → REVIEWED | DRAFT -->
+              <div v-if="dec.status === 'GENERATED'" class="flex flex-wrap gap-2">
+                <BaseButton
+                  variant="primary"
+                  size="sm"
+                  :loading="updatingDeclaration[dec.id] === 'REVIEWED'"
+                  @click="onUpdateDeclaration(dec, 'REVIEWED')"
+                >
+                  Marcar como revisada
+                </BaseButton>
                 <BaseButton
                   variant="primary-outline"
                   size="sm"
-                  :loading="updatingDeclaration[dec.id]"
+                  :loading="updatingDeclaration[dec.id] === 'DRAFT'"
                   @click="onUpdateDeclaration(dec, 'DRAFT')"
                 >
-                  Reabrir borrador
+                  Volver a borrador
                 </BaseButton>
-              </template>
+              </div>
 
-              <!-- ACCEPTED — no actions, just a note -->
-              <template v-if="dec.status === 'ACCEPTED'">
-                <p class="text-xs text-green-600">
-                  Declaración aceptada. El IdSistemaInformatico de esta declaración es válido para envíos a la AEAT.
+              <!-- REVIEWED → ACTIVE | DRAFT -->
+              <div v-if="dec.status === 'REVIEWED'" class="flex flex-wrap gap-2">
+                <BaseButton
+                  variant="primary"
+                  size="sm"
+                  :loading="updatingDeclaration[dec.id] === 'ACTIVE'"
+                  @click="onUpdateDeclaration(dec, 'ACTIVE')"
+                >
+                  Activar como vigente
+                </BaseButton>
+                <BaseButton
+                  variant="primary-outline"
+                  size="sm"
+                  :loading="updatingDeclaration[dec.id] === 'DRAFT'"
+                  @click="onUpdateDeclaration(dec, 'DRAFT')"
+                >
+                  Volver a borrador
+                </BaseButton>
+              </div>
+
+              <!-- ACTIVE — declaración vigente, sin acciones manuales -->
+              <div v-if="dec.status === 'ACTIVE'">
+                <p class="text-xs text-green-700 font-medium">
+                  Declaración vigente del SIF. El IdSistemaInformatico de esta versión está incorporado y activo en el sistema.
                 </p>
-              </template>
+              </div>
+
+              <!-- ARCHIVED — sin acciones -->
+              <div v-if="dec.status === 'ARCHIVED'">
+                <p class="text-xs text-gray-400">Archivada. Superada por una declaración más reciente.</p>
+              </div>
             </div>
           </BaseCard>
         </div>
@@ -781,11 +856,14 @@ const uploadError = ref('')
 
 // Global platform SIF form (shared across all companies)
 const platformForm = reactive({
-  software_name: '',
-  software_version: '',
-  vendor_name: '',
-  vendor_tax_id: '',
-  software_id: '',
+  software_name:       '',
+  software_version:    '',
+  vendor_name:         '',
+  vendor_tax_id:       '',
+  software_id:         '',
+  vendor_address:      '',
+  vendor_description:  '',
+  subscription_place:  '',
 })
 
 const platformErrors = reactive({
@@ -848,31 +926,42 @@ function declarationBadgeClass(status) {
 }
 
 function declarationStatusClass(status) {
-  if (status === 'ACCEPTED') return 'bg-green-100 text-green-800'
-  if (status === 'REJECTED') return 'bg-red-100 text-red-700'
-  if (status === 'SUBMITTED') return 'bg-blue-100 text-blue-800'
-  return 'bg-gray-100 text-gray-600'
+  if (status === 'ACTIVE')    return 'bg-green-100 text-green-800'
+  if (status === 'REVIEWED')  return 'bg-blue-100 text-blue-800'
+  if (status === 'GENERATED') return 'bg-yellow-100 text-yellow-800'
+  if (status === 'ARCHIVED')  return 'bg-gray-100 text-gray-500'
+  return 'bg-gray-100 text-gray-600'   // DRAFT
 }
 
 function declarationDotClass(status) {
-  if (status === 'ACCEPTED') return 'bg-green-500'
-  if (status === 'REJECTED') return 'bg-red-500'
-  if (status === 'SUBMITTED') return 'bg-blue-500'
-  return 'bg-gray-400'
+  if (status === 'ACTIVE')    return 'bg-green-500'
+  if (status === 'REVIEWED')  return 'bg-blue-500'
+  if (status === 'GENERATED') return 'bg-yellow-500'
+  if (status === 'ARCHIVED')  return 'bg-gray-300'
+  return 'bg-gray-400'   // DRAFT
 }
 
 function declarationStatusLabel(status) {
-  const map = { DRAFT: 'Borrador', SUBMITTED: 'Presentada', ACCEPTED: 'Aceptada', REJECTED: 'Rechazada' }
+  const map = {
+    DRAFT:     'Borrador',
+    GENERATED: 'Generada',
+    REVIEWED:  'Revisada',
+    ACTIVE:    'Vigente',
+    ARCHIVED:  'Archivada',
+  }
   return map[status] || status
 }
 
 function syncPlatformForm() {
   if (!platform.value) return
-  platformForm.software_name   = platform.value.software_name   || ''
-  platformForm.software_version= platform.value.software_version || ''
-  platformForm.vendor_name     = platform.value.vendor_name     || ''
-  platformForm.vendor_tax_id   = platform.value.vendor_tax_id   || ''
-  platformForm.software_id     = platform.value.software_id     || ''
+  platformForm.software_name      = platform.value.software_name      || ''
+  platformForm.software_version   = platform.value.software_version   || ''
+  platformForm.vendor_name        = platform.value.vendor_name        || ''
+  platformForm.vendor_tax_id      = platform.value.vendor_tax_id      || ''
+  platformForm.software_id        = platform.value.software_id        || ''
+  platformForm.vendor_address     = platform.value.vendor_address     || ''
+  platformForm.vendor_description = platform.value.vendor_description || ''
+  platformForm.subscription_place = platform.value.subscription_place || ''
 }
 
 function syncFormFromInstallation() {
@@ -910,11 +999,14 @@ async function onSavePlatform() {
   savingPlatform.value = true
   try {
     const { data } = await axios.put('/api/v1/verifactu/platform', {
-      software_name:    platformForm.software_name.trim(),
-      software_version: platformForm.software_version.trim(),
-      vendor_name:      platformForm.vendor_name.trim(),
-      vendor_tax_id:    platformForm.vendor_tax_id.trim().toUpperCase(),
-      software_id:      platformForm.software_id.trim(),
+      software_name:       platformForm.software_name.trim(),
+      software_version:    platformForm.software_version.trim(),
+      vendor_name:         platformForm.vendor_name.trim(),
+      vendor_tax_id:       platformForm.vendor_tax_id.trim().toUpperCase(),
+      software_id:         platformForm.software_id.trim(),
+      vendor_address:      platformForm.vendor_address.trim()      || null,
+      vendor_description:  platformForm.vendor_description.trim()  || null,
+      subscription_place:  platformForm.subscription_place.trim()  || null,
     })
     platform.value = data.platform
     syncPlatformForm()

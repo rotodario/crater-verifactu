@@ -17,12 +17,15 @@ class GetPlatformConfigController extends Controller
 
         return response()->json([
             'platform' => [
-                'software_name'   => $config->software_name   ?: config('verifactu.software.name'),
-                'software_version'=> $config->software_version ?: config('verifactu.software.version'),
-                'vendor_name'     => $config->vendor_name,
-                'vendor_tax_id'   => $config->vendor_tax_id,
-                'software_id'     => $config->software_id,
-                'is_persisted'    => $config->exists,
+                'software_name'       => $config->software_name    ?: config('verifactu.software.name'),
+                'software_version'    => $config->software_version ?: config('verifactu.software.version'),
+                'vendor_name'         => $config->vendor_name,
+                'vendor_tax_id'       => $config->vendor_tax_id,
+                'software_id'         => $config->software_id,
+                'vendor_address'      => $config->vendor_address,
+                'vendor_description'  => $config->vendor_description,
+                'subscription_place'  => $config->subscription_place,
+                'is_persisted'        => $config->exists,
             ],
         ]);
     }
