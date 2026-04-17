@@ -85,8 +85,7 @@
       font-size: 8.5px;
       font-weight: bold;
       color: #1E3A5F;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
+      letter-spacing: 0.4px;
       border-bottom: 1px solid #d1d9e6;
       padding-bottom: 3px;
       margin-bottom: 9px;
@@ -181,10 +180,22 @@
 
   $hasPending = empty($p['vendor_address']) || empty($p['subscription_place']);
 
-  // Fecha de suscripción: cuando se generó el snapshot (GENERATED)
+  // Fecha de suscripción en español (independiente del locale del sistema)
+  $mesesEs = ['enero','febrero','marzo','abril','mayo','junio',
+               'julio','agosto','septiembre','octubre','noviembre','diciembre'];
   $dateSigned = $declaration->generated_at
-      ? $declaration->generated_at->format('d \d\e F \d\e Y')
+      ? $declaration->generated_at->day . ' de ' . $mesesEs[$declaration->generated_at->month - 1] . ' de ' . $declaration->generated_at->year
       : '[Pendiente]';
+
+  // Etiquetas de estado en español para el PDF
+  $statusLabels = [
+      'ACTIVE'    => 'Vigente',
+      'REVIEWED'  => 'En revisión',
+      'GENERATED' => 'Generado',
+      'ARCHIVED'  => 'Archivada',
+      'DRAFT'     => 'Borrador',
+  ];
+  $statusLabel = $statusLabels[$declaration->status] ?? $declaration->status;
 
   // Datos clave para interpolar en textos legales
   $softwareName    = $p['software_name']  ?? $declaration->software_name  ?? '[sistema]';
@@ -218,8 +229,8 @@
         <td style="vertical-align:top; text-align:right; padding:0; width:140px;">
           <div class="doc-meta">
             <div>Ref. interna: <strong>#{{ $declaration->id }}</strong></div>
-            <div style="margin-top:4px;">
-              <span class="status-badge status-{{ $declaration->status }}">{{ $declaration->status }}</span>
+            <div style="margin-top:5px; font-size:8px; color:#9ca3af;">
+              Estado interno: {{ $statusLabel }}
             </div>
             @if($declaration->generated_at)
               <div style="margin-top:4px;">{{ $declaration->generated_at->format('d/m/Y') }}</div>
@@ -324,9 +335,32 @@
     </div>
   </div>
 
-  {{-- ─── SECCIÓN 2: DESCRIPCIÓN TÉCNICA ─── --}}
+  {{-- ─── 1.l SUSCRIPCIÓN (cierra el bloque 1) ─── --}}
   <div class="section">
-    <div class="section-title">2. Descripción técnica del sistema</div>
+    <div class="section-title">1.l) Suscripción de la declaración</div>
+    <table class="sig-table">
+      <tr>
+        <td class="sig-label">Fecha:</td>
+        <td class="sig-value">{{ $dateSigned }}</td>
+        <td class="sig-label">Lugar:</td>
+        <td class="sig-value">{!! $pval($p['subscription_place'] ?? null) !!}</td>
+      </tr>
+      <tr>
+        <td class="sig-label" style="padding-top:6px;">En representación de:</td>
+        <td class="sig-value" style="padding-top:6px;">{!! $pval($p['vendor_name'] ?? null) !!}</td>
+        <td class="sig-label" style="padding-top:6px;">NIF:</td>
+        <td class="sig-value" style="padding-top:6px;">{!! $pval($p['vendor_tax_id'] ?? null, true) !!}</td>
+      </tr>
+    </table>
+    <div style="margin-top:18px;">
+      <div class="sig-label" style="margin-bottom:3px;">Firma del productor:</div>
+      <div class="sig-line"></div>
+    </div>
+  </div>
+
+  {{-- ─── SECCIÓN 2: DESCRIPCIÓN TÉCNICA (anexo) ─── --}}
+  <div class="section">
+    <div class="section-title">2. Descripción técnica del sistema — Anexo</div>
 
     <div class="tech-block" style="margin-bottom:6px;">
       <div class="tech-label">2.a)&nbsp; Mecanismo de encadenamiento e integridad</div>
@@ -359,29 +393,6 @@
         impidiendo cualquier edición o eliminación posterior sin el correspondiente registro de anulación
         (RegistroBaja), conforme al artículo 12 del Real Decreto 1007/2023.
       </div>
-    </div>
-  </div>
-
-  {{-- ─── 1.l SUSCRIPCIÓN ─── --}}
-  <div class="section">
-    <div class="section-title">1.l) Suscripción de la declaración</div>
-    <table class="sig-table">
-      <tr>
-        <td class="sig-label">Fecha:</td>
-        <td class="sig-value">{{ $dateSigned }}</td>
-        <td class="sig-label">Lugar:</td>
-        <td class="sig-value">{!! $pval($p['subscription_place'] ?? null) !!}</td>
-      </tr>
-      <tr>
-        <td class="sig-label" style="padding-top:6px;">En representación de:</td>
-        <td class="sig-value" style="padding-top:6px;">{!! $pval($p['vendor_name'] ?? null) !!}</td>
-        <td class="sig-label" style="padding-top:6px;">NIF:</td>
-        <td class="sig-value" style="padding-top:6px;">{!! $pval($p['vendor_tax_id'] ?? null, true) !!}</td>
-      </tr>
-    </table>
-    <div style="margin-top:18px;">
-      <div class="sig-label" style="margin-bottom:3px;">Firma del productor:</div>
-      <div class="sig-line"></div>
     </div>
   </div>
 
