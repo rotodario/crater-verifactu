@@ -105,5 +105,59 @@ class AeatSandboxDriver implements VerifactuDriverInterface
         if (! $hasCert) {
             throw new RuntimeException('No certificate configured. Upload one in VERI*FACTU Setup.');
         }
+
+        // Pre-flight: detect personal (firma) certificates before AEAT rejects with a cryptic 401.
+        // AEAT VERI*FACTU only accepts Certificados de Sello (tipo 0). Personal DNI/firma
+        // certificates (tipo 1) are rejected at the SOAP layer with "Solo se admiten certificados de SELLO".
+        if ($installation && $installation->hasCertificate()) {
+            $this->warnIfPersonalCertificate($installation->getCertBytes(), $installation->getCertPassword());
+        } elseif ($path = config('verifactu.aeat.certificate_path')) {
+            if (file_exists($path)) {
+                $this->warnIfPersonalCertificate(file_get_contents($path), config('verifactu.aeat.certificate_password', ''));
+            }
+        }
+    }
+
+    /**
+     * Parse the PKCS12 certificate and throw a descriptive error if it is a
+     * personal-signature certificate (persona física / firma electrónica).
+     *
+     * AEAT VERI*FACTU requires a Certificado de Sello de Entidad (OID 1.3.6.1.4.1.5734.3.10.5
+     * for FNMT, or equivalent from other accredited CAs). Personal certificates
+     * (OID 1.3.6.1.4.1.5734.3.10.1 for FNMT Ciudadano, serialNumber starting with IDCES-)
+     * are rejected by the AEAT endpoint with HTTP 401.
+     */
+    private function warnIfPersonalCertificate(string $certBytes, string $password): void
+    {
+        $certs = [];
+        if (! @openssl_pkcs12_read($certBytes, $certs, $password)) {
+            return; // Can't parse — let the actual send fail with its own error.
+        }
+
+        if (empty($certs['cert'])) {
+            return;
+        }
+
+        $parsed = openssl_x509_parse($certs['cert']);
+
+        // Indicator 1: serialNumber contains IDCES- (FNMT DNI personal cert)
+        $serial = $parsed['subject']['serialNumber'] ?? '';
+        if (str_starts_with($serial, 'IDCES-')) {
+            throw new RuntimeException(
+                'Certificado de persona física detectado (serialNumber: ' . $serial . '). ' .
+                'AEAT VERI*FACTU solo acepta Certificados de Sello de Entidad (persona jurídica). ' .
+                'Obtén un Certificado de Representante de Persona Jurídica en sede.fnmt.gob.es.'
+            );
+        }
+
+        // Indicator 2: FNMT OID for Certificado de Ciudadano (1.3.6.1.4.1.5734.3.10.1)
+        $policies = $parsed['extensions']['certificatePolicies'] ?? '';
+        if (str_contains($policies, '1.3.6.1.4.1.5734.3.10.1')) {
+            throw new RuntimeException(
+                'Certificado FNMT de Ciudadano detectado (OID 1.3.6.1.4.1.5734.3.10.1). ' .
+                'AEAT VERI*FACTU solo acepta Certificados de Sello de Entidad (OID 1.3.6.1.4.1.5734.3.10.5). ' .
+                'Obtén un Certificado de Representante de Persona Jurídica en sede.fnmt.gob.es.'
+            );
+        }
     }
 }

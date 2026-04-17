@@ -99,5 +99,45 @@ class AeatProductionDriver implements VerifactuDriverInterface
         if (! $hasCert) {
             throw new RuntimeException('No certificate configured. Upload one in VERI*FACTU Setup.');
         }
+
+        if ($installation && $installation->hasCertificate()) {
+            $this->warnIfPersonalCertificate($installation->getCertBytes(), $installation->getCertPassword());
+        } elseif ($path = config('verifactu.aeat.certificate_path')) {
+            if (file_exists($path)) {
+                $this->warnIfPersonalCertificate(file_get_contents($path), config('verifactu.aeat.certificate_password', ''));
+            }
+        }
+    }
+
+    private function warnIfPersonalCertificate(string $certBytes, string $password): void
+    {
+        $certs = [];
+        if (! @openssl_pkcs12_read($certBytes, $certs, $password)) {
+            return;
+        }
+
+        if (empty($certs['cert'])) {
+            return;
+        }
+
+        $parsed = openssl_x509_parse($certs['cert']);
+
+        $serial = $parsed['subject']['serialNumber'] ?? '';
+        if (str_starts_with($serial, 'IDCES-')) {
+            throw new RuntimeException(
+                'Certificado de persona física detectado (serialNumber: ' . $serial . '). ' .
+                'AEAT VERI*FACTU solo acepta Certificados de Sello de Entidad (persona jurídica). ' .
+                'Obtén un Certificado de Representante de Persona Jurídica en sede.fnmt.gob.es.'
+            );
+        }
+
+        $policies = $parsed['extensions']['certificatePolicies'] ?? '';
+        if (str_contains($policies, '1.3.6.1.4.1.5734.3.10.1')) {
+            throw new RuntimeException(
+                'Certificado FNMT de Ciudadano detectado (OID 1.3.6.1.4.1.5734.3.10.1). ' .
+                'AEAT VERI*FACTU solo acepta Certificados de Sello de Entidad (OID 1.3.6.1.4.1.5734.3.10.5). ' .
+                'Obtén un Certificado de Representante de Persona Jurídica en sede.fnmt.gob.es.'
+            );
+        }
     }
 }
