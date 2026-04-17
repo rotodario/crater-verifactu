@@ -55,14 +55,19 @@ class InvoiceResource extends JsonResource
             'overdue' => $this->overdue,
             'verifactu_qr_string' => $this->verifactuQrString,
             'verifactu_record' => $this->when($this->verifactuRecord, function () {
+                $hasAeatCsv = $this->verifactuRecord
+                    ->submissions()
+                    ->whereNotNull('csv')
+                    ->exists();
                 return [
-                    'id' => $this->verifactuRecord->id,
-                    'status' => $this->verifactuRecord->status,
-                    'invoice_uid' => $this->verifactuRecord->invoice_uid,
-                    'hash' => $this->verifactuRecord->hash,
-                    'previous_hash' => $this->verifactuRecord->previous_hash,
-                    'issued_at' => $this->verifactuRecord->issued_at,
-                    'qr_payload' => $this->verifactuRecord->qr_payload,
+                    'id'           => $this->verifactuRecord->id,
+                    'status'       => $this->verifactuRecord->status,
+                    'invoice_uid'  => $this->verifactuRecord->invoice_uid,
+                    'hash'         => $this->verifactuRecord->hash,
+                    'previous_hash'=> $this->verifactuRecord->previous_hash,
+                    'issued_at'    => $this->verifactuRecord->issued_at,
+                    'qr_payload'   => $this->verifactuRecord->qr_payload,
+                    'has_aeat_csv' => $hasAeatCsv,
                 ];
             }),
             'items' => $this->when($this->items()->exists(), function () {

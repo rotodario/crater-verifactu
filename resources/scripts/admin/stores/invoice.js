@@ -379,6 +379,24 @@ export const useInvoiceStore = (useWindow = false) => {
         })
       },
 
+      resetFiscalIssuance(data) {
+        return new Promise((resolve, reject) => {
+          axios
+            .post(`/api/v1/invoices/${data.id}/reset-fiscal`)
+            .then((response) => {
+              notificationStore.showNotification({
+                type: 'success',
+                message: 'Emisión fiscal reseteada. La factura puede volver a expedirse.',
+              })
+              resolve(response)
+            })
+            .catch((err) => {
+              handleError(err)
+              reject(err)
+            })
+        })
+      },
+
       getNextNumber(params, setState = false) {
         return new Promise((resolve, reject) => {
           const key = params?.key || 'invoice'

@@ -318,6 +318,7 @@ Route::prefix('/v1')->group(function () {
 
             Route::post('/invoices/{invoice}/issue', IssueInvoiceController::class);
             Route::post('/invoices/{invoice}/annul', AnnulInvoiceController::class);
+            Route::post('/invoices/{invoice}/reset-fiscal', \Crater\Http\Controllers\V1\Admin\Invoice\ResetFiscalIssuanceController::class);
 
             Route::post('/invoices/delete', [InvoicesController::class, 'delete']);
 

@@ -29,6 +29,7 @@ const isMarkAsSent = ref(false)
 const isLoading = ref(false)
 const isIssuing = ref(false)
 const isAnnulling = ref(false)
+const isResetting = ref(false)
 
 const invoiceList = ref(null)
 const currentPageNumber = ref(1)
@@ -84,6 +85,16 @@ const canAnnulFiscally = computed(() => {
     userStore.hasAbilities(abilities.MANAGE_VERIFACTU) &&
     ['ISSUED', 'SUBMITTED', 'ACCEPTED'].includes(invoiceData.value.fiscal_status)
   )
+})
+
+// Show reset button when the invoice was fiscally issued (stub/shadow) but has no real AEAT CSV.
+// This lets the user re-issue against sandbox/production after a mode change.
+const canResetFiscalIssuance = computed(() => {
+  if (!invoiceData.value || !userStore.hasAbilities(abilities.MANAGE_VERIFACTU)) return false
+  const status = invoiceData.value.fiscal_status
+  if (!status || status === 'NOT_ISSUED' || status === 'ANNULLED') return false
+  const record = invoiceData.value.verifactu_record
+  return record && record.has_aeat_csv === false
 })
 function getFiscalBadgeColor(status) {
   switch (status) {
@@ -196,6 +207,30 @@ async function onAnnulFiscally() {
           invoiceData.value = { ...invoiceData.value, ...result.data.data }
         } finally {
           isAnnulling.value = false
+        }
+      }
+    })
+}
+
+async function onResetFiscalIssuance() {
+  dialogStore
+    .openDialog({
+      title: '¿Resetear emisión fiscal?',
+      message: 'Se eliminará el registro fiscal de stub/shadow y la factura podrá volver a expedirse fiscalmente contra la AEAT real. Solo es posible si no existe CSV real de la AEAT.',
+      yesLabel: 'Resetear',
+      noLabel: t('general.cancel'),
+      variant: 'warning',
+      hideNoButton: false,
+      size: 'lg',
+    })
+    .then(async (response) => {
+      if (response) {
+        isResetting.value = true
+        try {
+          const result = await invoiceStore.resetFiscalIssuance({ id: invoiceData.value.id })
+          invoiceData.value = { ...invoiceData.value, ...result.data.data }
+        } finally {
+          isResetting.value = false
         }
       }
     })
@@ -391,12 +426,22 @@ onSearched = debounce(onSearched, 500)
 
         <BaseButton
           v-if="canAnnulFiscally"
-          variant="danger-outline"
+          variant="danger"
           class="ml-3 text-sm"
           :disabled="isAnnulling"
           @click="onAnnulFiscally"
         >
           {{ isAnnulling ? 'Anulando...' : 'Anular fiscalmente' }}
+        </BaseButton>
+
+        <BaseButton
+          v-if="canResetFiscalIssuance"
+          variant="gray"
+          class="ml-3 text-sm"
+          :disabled="isResetting"
+          @click="onResetFiscalIssuance"
+        >
+          {{ isResetting ? 'Reseteando...' : 'Resetear emisión fiscal' }}
         </BaseButton>
 
         <div v-if="invoiceData" class="ml-3 flex items-center gap-2">
