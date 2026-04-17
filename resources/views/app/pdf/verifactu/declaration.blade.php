@@ -272,10 +272,6 @@
         <td class="data-label" style="padding-top:5px;">1.f)&nbsp; IdSistemaInformatico</td>
         <td colspan="3" style="padding-top:5px;">{!! $pval($p['software_id'] ?? null, true) !!}</td>
       </tr>
-      <tr>
-        <td class="data-label" style="padding-top:5px;">1.h)&nbsp; Tipo de sistema</td>
-        <td colspan="3" style="padding-top:5px;"><span class="data-value">Desarrollado por el propio productor &mdash; plataforma SaaS multi-empresa</span></td>
-      </tr>
     </table>
   </div>
 
@@ -305,6 +301,16 @@
         </ul>
       @endif
     </div>
+  </div>
+
+  {{-- ─── 1.h TIPO DE SISTEMA ─── --}}
+  <div class="section">
+    <div class="section-title">1.h) Tipo de sistema</div>
+    <table class="data-table">
+      <tr>
+        <td><span class="data-value">Desarrollado por el propio productor &mdash; plataforma SaaS multi-empresa</span></td>
+      </tr>
+    </table>
   </div>
 
   {{-- ─── 1.k DECLARACIÓN RESPONSABLE ─── --}}
