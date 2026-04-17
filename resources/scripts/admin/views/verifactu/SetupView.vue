@@ -570,53 +570,170 @@
 
       <!-- ── DECLARACIONES ── -->
       <div v-if="activeTab === 'declaraciones'">
-        <BaseCard>
-          <template #header><h3 class="font-semibold text-gray-900">Declaraciones responsables</h3></template>
 
-          <div v-if="!declarations.length" class="text-sm text-gray-500">
-            No hay declaraciones disponibles.
+        <!-- Explanation -->
+        <div class="flex items-start gap-3 p-4 mb-5 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800">
+          <BaseIcon name="InformationCircleIcon" class="h-5 w-5 shrink-0 mt-0.5 text-blue-500" />
+          <div>
+            <p class="font-semibold">¿Qué es la Declaración Responsable?</p>
+            <p class="mt-1">
+              Antes de usar VERI*FACTU en producción debes declarar el software ante la AEAT.
+              Genera el borrador aquí, revisa los datos y preséntalo en la
+              <strong>Sede Electrónica de la AEAT</strong> con tu certificado digital de desarrollador.
+              Una vez aceptado, marca la declaración como presentada y luego como aceptada.
+            </p>
           </div>
-          <div v-else class="overflow-x-auto">
-            <table class="min-w-full text-sm">
-              <thead>
-                <tr class="border-b border-gray-200">
-                  <th class="py-3 pr-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">ID</th>
-                  <th class="py-3 pr-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Software</th>
-                  <th class="py-3 pr-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Versión</th>
-                  <th class="py-3 pr-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Estado</th>
-                  <th class="py-3 pr-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Declarado</th>
-                  <th class="py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Creado</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="declaration in declarations"
-                  :key="declaration.id"
-                  class="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors"
-                >
-                  <td class="py-3 pr-4">
-                    <router-link
-                      :to="`/admin/verifactu/declarations/${declaration.id}/view`"
-                      class="text-primary-500 hover:underline"
-                    >
-                      #{{ declaration.id }}
-                    </router-link>
-                  </td>
-                  <td class="py-3 pr-4 text-gray-700">{{ declaration.software_name || '—' }}</td>
-                  <td class="py-3 pr-4 font-mono text-gray-700">{{ declaration.software_version || '—' }}</td>
-                  <td class="py-3 pr-4">
-                    <span :class="declarationBadgeClass(declaration.status)"
-                      class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium">
-                      {{ declaration.status || '—' }}
-                    </span>
-                  </td>
-                  <td class="py-3 pr-4 text-gray-500 text-xs">{{ declaration.declared_at || '—' }}</td>
-                  <td class="py-3 text-gray-500 text-xs">{{ declaration.created_at || '—' }}</td>
-                </tr>
-              </tbody>
-            </table>
+        </div>
+
+        <!-- Create button -->
+        <div v-if="canManage" class="flex justify-end mb-4">
+          <BaseButton
+            variant="primary-outline"
+            :loading="creatingDeclaration"
+            @click="onCreateDeclaration"
+          >
+            <template #left="slotProps">
+              <BaseIcon name="PlusIcon" :class="slotProps.class" />
+            </template>
+            Nueva declaración
+          </BaseButton>
+        </div>
+
+        <!-- Empty state -->
+        <BaseCard v-if="!declarations.length">
+          <div class="py-10 text-center">
+            <BaseIcon name="DocumentTextIcon" class="mx-auto h-10 w-10 text-gray-300 mb-3" />
+            <p class="text-sm font-medium text-gray-600">No hay declaraciones registradas</p>
+            <p class="mt-1 text-xs text-gray-400">
+              Completa la Plataforma SIF y crea tu primera declaración responsable.
+            </p>
           </div>
         </BaseCard>
+
+        <!-- Declaration cards -->
+        <div v-else class="space-y-4">
+          <BaseCard
+            v-for="dec in declarations"
+            :key="dec.id"
+          >
+            <!-- Card header -->
+            <template #header>
+              <div class="flex items-center justify-between gap-3 flex-wrap">
+                <div class="flex items-center gap-3">
+                  <span class="text-sm font-mono text-gray-400">#{{ dec.id }}</span>
+                  <span class="font-semibold text-gray-900">
+                    {{ dec.software_name }} <span class="font-mono text-gray-500">v{{ dec.software_version }}</span>
+                  </span>
+                  <span :class="declarationStatusClass(dec.status)"
+                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold">
+                    <span :class="declarationDotClass(dec.status)" class="h-1.5 w-1.5 rounded-full inline-block"></span>
+                    {{ declarationStatusLabel(dec.status) }}
+                  </span>
+                </div>
+                <span class="text-xs text-gray-400">Creada {{ dec.created_at }}</span>
+              </div>
+            </template>
+
+            <!-- Payload details -->
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 text-sm mb-5">
+              <div>
+                <p class="text-xs text-gray-400 mb-0.5">Nombre del software</p>
+                <p class="font-medium text-gray-800">{{ dec.declaration_payload?.software_name || '—' }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400 mb-0.5">Versión</p>
+                <p class="font-mono text-gray-800">{{ dec.declaration_payload?.software_version || '—' }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400 mb-0.5">IdSistemaInformatico</p>
+                <p class="font-mono text-gray-800">{{ dec.declaration_payload?.software_id || '—' }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400 mb-0.5">Desarrollador (NombreRazon)</p>
+                <p class="text-gray-800">{{ dec.declaration_payload?.vendor_name || '—' }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400 mb-0.5">NIF del desarrollador</p>
+                <p class="font-mono text-gray-800">{{ dec.declaration_payload?.vendor_tax_id || '—' }}</p>
+              </div>
+              <div v-if="dec.declared_at">
+                <p class="text-xs text-gray-400 mb-0.5">Presentada el</p>
+                <p class="text-gray-800">{{ dec.declared_at }}</p>
+              </div>
+            </div>
+
+            <!-- Notes -->
+            <div v-if="dec.declaration_payload?.notes" class="mb-4 p-3 bg-gray-50 rounded-md border border-gray-100 text-sm text-gray-600">
+              <span class="font-medium">Notas:</span> {{ dec.declaration_payload.notes }}
+            </div>
+
+            <!-- Action buttons per status -->
+            <div v-if="canManage" class="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
+
+              <!-- DRAFT → SUBMITTED -->
+              <template v-if="dec.status === 'DRAFT'">
+                <div class="flex items-center gap-2 flex-wrap w-full">
+                  <input
+                    v-model="declarationNotes[dec.id]"
+                    type="text"
+                    class="flex-1 min-w-48 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    placeholder="Referencia AEAT o notas (opcional)"
+                  />
+                  <BaseButton
+                    variant="primary"
+                    size="sm"
+                    :loading="updatingDeclaration[dec.id]"
+                    @click="onUpdateDeclaration(dec, 'SUBMITTED')"
+                  >
+                    Marcar como presentada
+                  </BaseButton>
+                </div>
+                <p class="text-xs text-gray-400 w-full">
+                  Presenta primero la declaración en la Sede Electrónica de la AEAT y luego marca como presentada.
+                </p>
+              </template>
+
+              <!-- SUBMITTED → ACCEPTED or REJECTED -->
+              <template v-if="dec.status === 'SUBMITTED'">
+                <BaseButton
+                  variant="primary"
+                  size="sm"
+                  :loading="updatingDeclaration[dec.id] === 'ACCEPTED'"
+                  @click="onUpdateDeclaration(dec, 'ACCEPTED')"
+                >
+                  Marcar como aceptada
+                </BaseButton>
+                <BaseButton
+                  variant="danger-outline"
+                  size="sm"
+                  :loading="updatingDeclaration[dec.id] === 'REJECTED'"
+                  @click="onUpdateDeclaration(dec, 'REJECTED')"
+                >
+                  Marcar como rechazada
+                </BaseButton>
+              </template>
+
+              <!-- REJECTED → DRAFT (re-draft) -->
+              <template v-if="dec.status === 'REJECTED'">
+                <BaseButton
+                  variant="primary-outline"
+                  size="sm"
+                  :loading="updatingDeclaration[dec.id]"
+                  @click="onUpdateDeclaration(dec, 'DRAFT')"
+                >
+                  Reabrir borrador
+                </BaseButton>
+              </template>
+
+              <!-- ACCEPTED — no actions, just a note -->
+              <template v-if="dec.status === 'ACCEPTED'">
+                <p class="text-xs text-green-600">
+                  Declaración aceptada. El IdSistemaInformatico de esta declaración es válido para envíos a la AEAT.
+                </p>
+              </template>
+            </div>
+          </BaseCard>
+        </div>
       </div>
 
     </div>
@@ -644,6 +761,9 @@ const saving = ref(false)
 const savingPlatform = ref(false)
 const savePlatformSuccess = ref(false)
 const saveSuccess = ref(false)
+const creatingDeclaration = ref(false)
+const updatingDeclaration = reactive({}) // { [id]: status string | true }
+const declarationNotes = reactive({})    // { [id]: string }
 const uploading = ref(false)
 const deletingCert = ref(false)
 
@@ -719,10 +839,26 @@ function envBadgeClass(env) {
 }
 
 function declarationBadgeClass(status) {
-  if (status === 'accepted') return 'bg-green-100 text-green-800'
-  if (status === 'rejected') return 'bg-red-100 text-red-700'
-  if (status === 'pending') return 'bg-yellow-100 text-yellow-800'
+  return declarationStatusClass(status)
+}
+
+function declarationStatusClass(status) {
+  if (status === 'ACCEPTED') return 'bg-green-100 text-green-800'
+  if (status === 'REJECTED') return 'bg-red-100 text-red-700'
+  if (status === 'SUBMITTED') return 'bg-blue-100 text-blue-800'
   return 'bg-gray-100 text-gray-600'
+}
+
+function declarationDotClass(status) {
+  if (status === 'ACCEPTED') return 'bg-green-500'
+  if (status === 'REJECTED') return 'bg-red-500'
+  if (status === 'SUBMITTED') return 'bg-blue-500'
+  return 'bg-gray-400'
+}
+
+function declarationStatusLabel(status) {
+  const map = { DRAFT: 'Borrador', SUBMITTED: 'Presentada', ACCEPTED: 'Aceptada', REJECTED: 'Rechazada' }
+  return map[status] || status
 }
 
 function syncPlatformForm() {
@@ -924,6 +1060,50 @@ async function onDeleteCertificate() {
     handleError(error)
   } finally {
     deletingCert.value = false
+  }
+}
+
+async function onCreateDeclaration() {
+  creatingDeclaration.value = true
+  try {
+    const { data } = await axios.post('/api/v1/verifactu/declarations')
+    declarations.value.unshift(data.declaration)
+    notificationStore.showNotification({ type: 'success', message: 'Borrador de declaración creado.' })
+  } catch (error) {
+    const msg = error.response?.data?.message
+    if (msg) {
+      notificationStore.showNotification({ type: 'error', message: msg })
+    } else {
+      handleError(error)
+    }
+  } finally {
+    creatingDeclaration.value = false
+  }
+}
+
+async function onUpdateDeclaration(declaration, newStatus) {
+  updatingDeclaration[declaration.id] = newStatus
+  try {
+    const { data } = await axios.put(`/api/v1/verifactu/declarations/${declaration.id}`, {
+      status: newStatus,
+      notes: declarationNotes[declaration.id] || undefined,
+    })
+    const idx = declarations.value.findIndex(d => d.id === declaration.id)
+    if (idx !== -1) declarations.value[idx] = data.declaration
+    declarationNotes[declaration.id] = ''
+    notificationStore.showNotification({
+      type: 'success',
+      message: `Declaración marcada como ${declarationStatusLabel(newStatus).toLowerCase()}.`,
+    })
+  } catch (error) {
+    const msg = error.response?.data?.message
+    if (msg) {
+      notificationStore.showNotification({ type: 'error', message: msg })
+    } else {
+      handleError(error)
+    }
+  } finally {
+    delete updatingDeclaration[declaration.id]
   }
 }
 
