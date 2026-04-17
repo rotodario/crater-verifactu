@@ -11,7 +11,7 @@ class UpdatePlatformConfigController extends Controller
 {
     public function __invoke(Request $request)
     {
-        $this->authorize('manage', VerifactuRecord::class);
+        $this->authorize('managePlatform', VerifactuRecord::class);
 
         $validated = $request->validate([
             'software_name'   => ['required', 'string', 'max:120'],

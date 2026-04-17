@@ -12,7 +12,7 @@ class CreateDeclarationController extends Controller
 {
     public function __invoke(Request $request, VerifactuDeclarationService $service)
     {
-        $this->authorize('manage', VerifactuRecord::class);
+        $this->authorize('managePlatform', VerifactuRecord::class);
 
         $companyId = (int) $request->header('company');
 

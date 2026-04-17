@@ -20,7 +20,7 @@ class UpdateDeclarationController extends Controller
 
     public function __invoke(Request $request, VerifactuDeclaration $declaration)
     {
-        $this->authorize('manage', VerifactuRecord::class);
+        $this->authorize('managePlatform', VerifactuRecord::class);
 
         $companyId = (int) $request->header('company');
         abort_unless((int) $declaration->company_id === $companyId, 404);

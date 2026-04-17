@@ -28,4 +28,13 @@ class VerifactuPolicy
 
         return false;
     }
+
+    /**
+     * Platform-level actions (global SIF config, declarations lifecycle).
+     * Restricted to the company owner / super admin only.
+     */
+    public function managePlatform(User $user)
+    {
+        return $user->isOwner();
+    }
 }

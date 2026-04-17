@@ -162,9 +162,9 @@
           <template #header>
             <div class="flex items-center justify-between">
               <h3 class="font-semibold text-gray-900">Identificación SIF de la plataforma</h3>
-              <span v-if="!canManage" class="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+              <span v-if="!canManagePlatform" class="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
                 <BaseIcon name="LockClosedIcon" class="h-3 w-3" />
-                Solo lectura
+                Solo superadmin
               </span>
             </div>
           </template>
@@ -191,7 +191,7 @@
               >
                 <BaseInput
                   v-model="platformForm.software_name"
-                  :disabled="!canManage"
+                  :disabled="!canManagePlatform"
                   type="text"
                   placeholder="Crater VERI*FACTU"
                   :invalid="!!platformErrors.software_name"
@@ -205,7 +205,7 @@
               >
                 <BaseInput
                   v-model="platformForm.software_version"
-                  :disabled="!canManage"
+                  :disabled="!canManagePlatform"
                   type="text"
                   placeholder="1.0.0"
                   class="font-mono"
@@ -227,7 +227,7 @@
                 >
                   <BaseInput
                     v-model="platformForm.vendor_name"
-                    :disabled="!canManage"
+                    :disabled="!canManagePlatform"
                     type="text"
                     placeholder="Tu empresa desarrolladora S.L."
                     :invalid="!!platformErrors.vendor_name"
@@ -241,7 +241,7 @@
                 >
                   <BaseInput
                     v-model="platformForm.vendor_tax_id"
-                    :disabled="!canManage"
+                    :disabled="!canManagePlatform"
                     type="text"
                     placeholder="B12345678"
                     class="font-mono uppercase"
@@ -266,7 +266,7 @@
                 >
                   <BaseInput
                     v-model="platformForm.software_id"
-                    :disabled="!canManage"
+                    :disabled="!canManagePlatform"
                     type="text"
                     placeholder="CRATER-VF-01"
                     class="font-mono"
@@ -276,7 +276,7 @@
               </div>
             </fieldset>
 
-            <div v-if="canManage" class="flex items-center gap-3 pt-2 border-t border-gray-100">
+            <div v-if="canManagePlatform" class="flex items-center gap-3 pt-2 border-t border-gray-100">
               <BaseButton
                 variant="primary"
                 :loading="savingPlatform"
@@ -586,7 +586,7 @@
         </div>
 
         <!-- Create button -->
-        <div v-if="canManage" class="flex justify-end mb-4">
+        <div v-if="canManagePlatform" class="flex justify-end mb-4">
           <BaseButton
             variant="primary-outline"
             :loading="creatingDeclaration"
@@ -668,7 +668,7 @@
             </div>
 
             <!-- Action buttons per status -->
-            <div v-if="canManage" class="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
+            <div v-if="canManagePlatform" class="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
 
               <!-- DRAFT → SUBMITTED -->
               <template v-if="dec.status === 'DRAFT'">
@@ -822,6 +822,11 @@ const tabs = [
 
 const canManage = computed(() =>
   userStore.hasAbilities(abilities.MANAGE_VERIFACTU)
+)
+
+// Platform-level config (SIF, declarations) — restricted to owner / super admin
+const canManagePlatform = computed(() =>
+  !!userStore.currentUser?.is_owner
 )
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
