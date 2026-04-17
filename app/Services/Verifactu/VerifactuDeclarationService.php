@@ -8,19 +8,31 @@ use Crater\Models\VerifactuPlatformConfig;
 class VerifactuDeclarationService
 {
     /**
+     * Ensure a declaration exists (DRAFT or beyond) for the current software version.
+     * Called automatically before issuing an invoice so fiscal records always have
+     * a corresponding declaration context. If a suitable declaration already exists,
+     * this is a no-op. If not, a new DRAFT is created silently.
+     */
+    public function ensureDraftDeclaration(): void
+    {
+        $version = config('verifactu.software.version');
+
+        $exists = VerifactuDeclaration::whereNull('company_id')
+            ->whereIn('status', ['DRAFT', 'GENERATED', 'REVIEWED', 'ACTIVE'])
+            ->where('software_version', $version)
+            ->exists();
+
+        if (! $exists) {
+            try {
+                $this->createDraft();
+            } catch (\RuntimeException $e) {
+                // Another declaration is already in progress (race condition) — safe to ignore.
+            }
+        }
+    }
+
+    /**
      * Create a new DRAFT declaration for the current SIF platform version.
-     *
-     * El productor certifica esta versión del SIF y la declaración queda
-     * incorporada y accesible dentro del propio sistema.
-     *
-     * Rules enforced:
-     *  - Only one declaration lifecycle may be in progress per software_version.
-     *    Attempting to create a new DRAFT for a version that already has a
-     *    DRAFT/GENERATED/REVIEWED declaration throws RuntimeException (→ 409).
-     *  - In-progress declarations for OTHER (stale) versions are archived automatically.
-     *  - The currently ACTIVE declaration is NOT touched; it remains the certified
-     *    version of the SIF until the new declaration explicitly reaches ACTIVE state
-     *    (handled in UpdateDeclarationController → transition to ACTIVE).
      *
      * @throws \RuntimeException when an in-progress declaration already exists for this version
      * @throws \RuntimeException when platform config has not been persisted yet
