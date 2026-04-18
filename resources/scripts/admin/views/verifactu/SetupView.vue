@@ -92,9 +92,28 @@
                 <dt class="text-gray-500">NIF/CIF</dt>
                 <dd class="text-gray-900 font-mono">{{ installation.issuer_tax_id || '—' }}</dd>
               </div>
-              <div class="flex justify-between">
-                <dt class="text-gray-500">Software</dt>
-                <dd class="text-gray-600 font-mono text-xs">{{ platform?.software_name || '—' }} {{ platform?.software_version || '' }}</dd>
+              <div class="flex justify-between items-start">
+                <dt class="text-gray-500 shrink-0">Software (AEAT)</dt>
+                <dd class="text-right">
+                  <template v-if="activeSoftware">
+                    <span class="text-gray-800 font-mono text-xs block">
+                      {{ activeSoftware.software_name }} v{{ activeSoftware.software_version }}
+                    </span>
+                    <span class="text-gray-400 font-mono text-xs block">ID: {{ activeSoftware.software_id }}</span>
+                    <span class="text-green-600 text-xs block mt-0.5">según DR #{{ activeSoftware.declaration_id }} activa</span>
+                    <!-- Warn if PlatformConfig has drifted from the active DR -->
+                    <span
+                      v-if="platform && (platform.software_name !== activeSoftware.software_name || platform.software_version !== activeSoftware.software_version)"
+                      class="text-amber-600 text-xs block mt-1"
+                    >
+                      ⚠ Plataforma SIF difiere ({{ platform.software_name }} v{{ platform.software_version }}) — activa una nueva DR para aplicar cambios
+                    </span>
+                  </template>
+                  <template v-else>
+                    <span class="text-gray-600 font-mono text-xs">{{ platform?.software_name || '—' }} {{ platform?.software_version || '' }}</span>
+                    <span class="text-amber-500 text-xs block mt-0.5">sin DR activa — usando config de plataforma</span>
+                  </template>
+                </dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-gray-500">Actualizado</dt>
@@ -928,6 +947,7 @@ const resetConfirmText = ref('')
 const installation = ref(null)
 const declarations = ref([])
 const platform = ref(null)
+const activeSoftware = ref(null)   // frozen payload from the ACTIVE declaration — what AEAT actually receives
 const activeTab = ref('resumen')
 
 const fileInput = ref(null)
@@ -1117,9 +1137,10 @@ async function loadSetup() {
       axios.get('/api/v1/verifactu/setup'),
       axios.get('/api/v1/verifactu/platform'),
     ])
-    installation.value = setupRes.data.installation || null
-    declarations.value = setupRes.data.declarations || []
-    platform.value = platformRes.data.platform || null
+    installation.value  = setupRes.data.installation || null
+    declarations.value  = setupRes.data.declarations || []
+    activeSoftware.value = setupRes.data.active_software || null
+    platform.value      = platformRes.data.platform || null
     syncFormFromInstallation()
     syncPlatformForm()
   } catch (error) {
