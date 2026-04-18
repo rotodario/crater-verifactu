@@ -1,187 +1,151 @@
-# VERI*FACTU Integration Notes
+# VERI*FACTU — Arquitectura técnica
+
+Última actualización: 2026-04-18.
 
 ## Objetivo
 
-Esta capa introduce una separacion explicita entre:
+Separación explícita entre:
 
-- Estado comercial de la factura en Crater.
-- Estado fiscal VERI*FACTU.
+- Estado comercial de la factura en Crater (`status`).
+- Estado fiscal VERI*FACTU (`fiscal_status`).
 - Pipeline de submission fiscal desacoplado del flujo comercial.
 
-No sustituye el flujo actual de Crater. Lo encapsula.
+La capa no sustituye el flujo de Crater. Lo encapsula.
 
-## Piezas nuevas
+## Tablas
 
-- `config/verifactu.php`
-- Tablas:
-  - `verifactu_installations`
-  - `verifactu_records`
-  - `verifactu_submissions`
-  - `verifactu_events`
-  - `verifactu_declarations`
-- Campos nuevos en `invoices`:
-  - `fiscal_status`
-  - `fiscal_issued_at`
-  - `fiscal_locked_at`
-  - `verifactu_record_id`
-  - `invoice_kind`
-  - `original_invoice_id`
-  - `rectification_type`
-  - `rectification_reason`
-- Campos fiscales nuevos en negocio:
-  - `companies.tax_number`
-  - `customers.tax_number`
-- Persistencia adicional relevante:
-  - `verifactu_records.tipo_factura`
-  - `verifactu_submissions.request_xml`
-  - `verifactu_submissions.response_xml`
-  - `verifactu_submissions.csv`
-- Job:
-  - `ProcessVerifactuSubmissionJob`
-- Command:
-  - `php artisan verifactu:process-pending`
+| Tabla | Propósito |
+|---|---|
+| `verifactu_installations` | Una por empresa. Modo, certificado, metadatos de instalación. |
+| `verifactu_records` | Registro fiscal inmutable (snapshot + hash). |
+| `verifactu_submissions` | Envío a AEAT: XML request/response, estado, CSV. |
+| `verifactu_events` | Log de eventos fiscales (expedición, anulación, reparación…). |
+| `verifactu_declarations` | Declaración Responsable del SIF. |
+| `verifactu_platform_config` | Identidad del SIF (una fila global para toda la plataforma). |
 
-## Capa de servicios actual
+## Campos nuevos en `invoices`
 
-### Nucleo de dominio
+`fiscal_status`, `fiscal_issued_at`, `fiscal_locked_at`, `verifactu_record_id`,
+`invoice_kind`, `original_invoice_id`, `rectification_type`, `rectification_reason`.
 
-- `VerifactuService`
-- `VerifactuRecordBuilder`
-- `VerifactuStateManager`
-- `VerifactuQrService`
-- `VerifactuEventLogger`
-- `VerifactuDeclarationService`
-- `VerifactuSubmissionService`
+## Capa de servicios
 
-### Resolucion de modo y drivers
+### Núcleo de dominio
 
-- `VerifactuDriverManager`
-- Drivers disponibles:
-  - `ShadowDriver`
-  - `StubDriver`
-  - `AeatSandboxDriver`
-  - `AeatProductionDriver`
+| Servicio | Responsabilidad |
+|---|---|
+| `VerifactuService` | Orquestación: validar, expedir, bloquear. |
+| `VerifactuRecordBuilder` | Construye el snapshot fiscal y computa hash+huella. |
+| `VerifactuStateManager` | Transiciones de `fiscal_status` en Invoice. |
+| `VerifactuQrService` | Genera el payload QR para el PDF. |
+| `VerifactuEventLogger` | Persiste eventos fiscales auditables. |
+| `VerifactuSubmissionService` | Crea y encola submissions. |
+| `VerifactuDeclarationService` | Ciclo de vida de la Declaración Responsable. |
+| `VerifactuHuellaComputer` | SHA-256 canónico según spec AEAT (Alta y Baja). |
+| `VerifactuXmlBuilder` | XML SOAP `RegistroAlta` + `RegistroBaja`. |
 
-### Preparacion AEAT
+### Drivers (resolución por modo)
 
-- `VerifactuPreSubmissionValidator`
-- `VerifactuHuellaComputer`
-- `VerifactuXmlBuilder`
-- `AeatHttpClient`
-- `AeatResponseParser`
+| Driver | Comportamiento |
+|---|---|
+| `ShadowDriver` | Solo registra. No envía. |
+| `StubDriver` | Simula envío con ACCEPTED local. |
+| `AeatSandboxDriver` | Envía a `prewww1`/`prewww10.aeat.es`. |
+| `AeatProductionDriver` | Envía a `www1`/`www10.agenciatributaria.gob.es`. |
 
-## Flujo minimo implantado
+Los drivers AEAT auto-seleccionan el endpoint correcto (persona física vs certificado de sello) inspeccionando el certificado PKCS12.
 
-1. La factura sigue naciendo como `DRAFT`.
-2. Cuando se envia o se marca como enviada, `VerifactuService` puede asegurar la expedicion fiscal segun modo y configuracion.
-3. Antes de expedir, `VerifactuPreSubmissionValidator` valida numero, fecha, total, lineas, software y datos fiscales minimos.
-4. Se genera un snapshot inmutable en `verifactu_records`.
-5. Se calcula `tipo_factura` y huella/hash encadenada.
-6. Se bloquea la edicion fiscal de la factura.
-7. Se registra un evento interno.
-8. Si el modo actual somete registros, se crea un `verifactu_submission` y se procesa por job o comando.
-9. La submission puede usar driver `shadow`, `stub` o drivers AEAT.
-10. Una factura fiscalmente expedida puede generar una rectificativa nueva mediante `POST /api/v1/invoices/{invoice}/rectify`.
+### Comunicación AEAT
 
-## Modos de funcionamiento
+- `AeatHttpClient`: SOAP mTLS con PKCS12 (.p12/.pfx) o PEM.
+- `AeatResponseParser`: parsea respuesta SOAP, extrae CSV, estado y errores por línea.
+- `AeatConsultaXmlBuilder` + `AeatConsultaParser`: consulta del libro registro AEAT.
+- `AeatHistorialService`: cruza datos locales con el historial AEAT.
+- `VerifactuReconciliacionService`: reconciliación local vs AEAT por ejercicio/periodo.
 
-Definidos en `config/verifactu.php`:
+## Flujo de expedición
 
-- `off`: capa desactivada, sin records ni submissions.
-- `shadow`: genera records y observabilidad, pensado para analisis sin envio operativo real.
-- `stub`: simulacion local completa del envio.
-- `aeat_sandbox`: preparado para endpoint de pruebas AEAT.
-- `aeat_production`: preparado para endpoint real AEAT.
+1. Factura nace como `DRAFT`.
+2. Cuando se expide (botón explícito, o `issue_on_send=true` al enviar):
+   - `VerifactuPreSubmissionValidator` valida número, fecha, total, software, NIF.
+   - `VerifactuRecordBuilder` genera snapshot inmutable + hash encadenado.
+   - `VerifactuStateManager` actualiza `fiscal_status = ISSUED` y bloquea edición.
+   - `VerifactuEventLogger` registra el evento.
+3. Si el modo envía (`aeat_sandbox`, `aeat_production`):
+   - Se crea `VerifactuSubmission` y se procesa por job/scheduler.
+   - El driver refresca `FechaHoraHusoGenRegistro` justo antes de enviar (ventana 240s AEAT).
+   - `issued_at` del record nunca se modifica tras la creación.
+4. La respuesta AEAT se persiste completa (XML + parsed payload).
 
-## Snapshot fiscal
+## Hash chain — clave de encadenamiento
 
-El snapshot ya incluye, como minimo:
+```
+previousRecord = VerifactuRecord
+    WHERE verifactu_installation_id = {installation.id}
+    ORDER BY id DESC
+    LIMIT 1
+```
 
-- datos de factura
-- datos de empresa
-- `company.tax_number`
-- datos de cliente
-- `customer.tax_number`
-- lineas e impuestos
-- identificacion del software
+**El ámbito es la instalación, no la empresa.** Esto garantiza que cadenas de diferentes instalaciones (sandbox vs production, reinstalaciones) no se crucen entre sí.
 
-Esto evita depender de mutaciones posteriores del modelo comercial para reconstruir el registro fiscal.
+## Inmutabilidad del registro fiscal
 
-## Submissions
+Una vez creado, `verifactu_records` es inmutable salvo:
+- `hash` + `metadata.fecha_hora_huso`: se actualizan justo antes de enviar por la restricción de 240s de AEAT. El hash original se preserva en `metadata.original_hash`.
+- `status`: cambia a ACCEPTED/FAILED/CANCELLED según el resultado.
+- `issued_at`: **nunca cambia** tras la creación. Representa cuándo se tomó la decisión fiscal.
 
-`verifactu_submissions` ya contempla dos niveles de persistencia:
+## Arquitectura multi-tenant SIF
 
-- payloads estructurados (`request_payload`, `response_payload`)
-- intercambio XML bruto (`request_xml`, `response_xml`)
-- referencia y CSV AEAT (`csv`, `external_reference`)
+```
+Plataforma (global — una fila en verifactu_platform_config)
+├── IdSistemaInformatico (software_id)
+├── software_name / software_version
+└── vendor_name / vendor_tax_id
 
-Estados actualmente usados:
+Por empresa (verifactu_installations)
+├── Certificado digital (.p12/.pfx/.pem)
+├── issuer_name / issuer_tax_id (NIF del obligado)
+├── installation_number
+└── mode (shadow | stub | aeat_sandbox | aeat_production)
+```
 
-- `PENDING`
-- `PROCESSING`
-- `ACCEPTED`
-- `FAILED`
-- `REJECTED`
+En el XML: `SistemaInformatico` usa datos de plataforma; `ObligadoEmision` usa datos de empresa.
 
-Operacion actual:
+## `issue_on_send`
 
-- Procesado manual: `php artisan verifactu:process-pending --limit=25`
-- Procesado automatico: scheduler cada 5 minutos
-- Reintento manual desde UI para submissions `FAILED`
+Controla si enviar una factura por email la expide fiscalmente de forma automática.
 
-## AEAT: base tecnica ya preparada
+**Default: `false`** (requiere activación explícita en `.env`).
 
-La capa actual ya deja preparada la estructura para salto a AEAT:
+Con `true`: el primer email bloquea la factura para siempre. Solo recomendado si el flujo garantiza que las facturas son siempre definitivas antes de enviarse al cliente.
 
-- `AeatHttpClient` para mTLS con certificado PEM/P12
-- `AeatResponseParser` para respuestas SOAP/XML
-- `VerifactuXmlBuilder` para construir XML `SuministroLRFacturasEmitidas`
-- `VerifactuHuellaComputer` para hash encadenado y formatos AEAT
+## Declaración Responsable del SIF
 
-Esto no significa homologacion final ni validacion completa. Significa que el sistema ya no esta solo en modo `stub` superficial.
+Estados: `DRAFT → GENERATED → REVIEWED → ACTIVE → ARCHIVED`.
 
-## Rectificativas
+- Una sola `ACTIVE` a la vez. Al activar una nueva, la anterior queda `ARCHIVED`.
+- Snapshot de datos de plataforma congelado al pasar a `GENERATED`.
+- PDF disponible desde `GENERATED` en adelante.
+- Nivel plataforma (`company_id = NULL`).
 
-- La rectificativa no modifica ni borra la factura original.
-- La factura nueva nace con:
-  - `invoice_kind=RECTIFICATIVE`
-  - `original_invoice_id=<factura original>`
-  - `rectification_type=REPLACEMENT`
-  - `fiscal_status=NOT_ISSUED`
-  - `status=DRAFT`
-- Se clonan lineas, impuestos y custom fields de la factura original como base de trabajo.
-- La referencia comercial se conserva en `reference_number` con el numero de la factura original.
+## Rectificativas (estado actual)
 
-### Limite actual
+- No destructivas: factura original queda bloqueada.
+- `invoice_kind = rectificative` → `tipo_factura = R4` (genérico).
+- Mapeo completo R1–R5 pendiente.
+- Rectificación por diferencias (importes negativos) pendiente.
 
-Esta primera implementacion crea una rectificativa de sustitucion base, pero no resuelve todavia:
+## Permisos
 
-- rectificacion por diferencias con importes negativos o parciales
-- mapeo definitivo `rectification_type -> tipo_factura R1-R5`
-- reglas finales AEAT por motivo de rectificacion
-
-## UI visible actual
-
-La capa visible ya no se limita a botones sueltos en facturas. Hoy existe:
-
-- `/admin/verifactu` dashboard
-- `/admin/verifactu/records`
-- `/admin/verifactu/submissions`
-- `/admin/verifactu/events`
-- `/admin/verifactu/setup`
-- detalle de record, submission, event y declaration
-
-## Seguridad y permisos
-
-- Policy dedicada: `VerifactuPolicy`
-- Abilities dedicadas:
-  - `view-verifactu`
-  - `manage-verifactu`
-- La idea es desacoplar la observabilidad VERI*FACTU de los permisos comerciales de factura.
+| Acción | Requiere |
+|---|---|
+| Ver cualquier cosa VERI*FACTU | `view-verifactu` |
+| Gestionar records / config empresa | `manage-verifactu` |
+| Editar Plataforma SIF / Declaraciones | `User::isOwner()` |
 
 ## Riesgos abiertos
 
-- La numeracion global de Crater sigue siendo delicada.
-- El flujo AEAT real aun necesita validacion externa.
-- La copia local ya contiene pruebas y no es una restauracion virgen.
-- Hay cambios funcionales nuevos sin commit posteriores al baseline `ad81b53`.
+- No hay homologación formal AEAT (funciona en sandbox, falta certificación oficial).
+- Cola de submissions en driver `sync` — sin reintentos automáticos persistentes.
+- Rectificativas avanzadas (R1–R5, por diferencias) no implementadas.

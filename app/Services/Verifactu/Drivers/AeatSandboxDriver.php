@@ -126,10 +126,21 @@ class AeatSandboxDriver implements VerifactuDriverInterface
      * If the hash changes (because the timestamp changed), any pending record
      * that chains from this one has its previous_hash updated automatically.
      */
+    /**
+     * Refresh FechaHoraHusoGenRegistro and recompute the Huella just before
+     * sending so the timestamp is always within AEAT's 240-second window.
+     *
+     * IMMUTABILITY NOTE:
+     * - issued_at is NOT touched — it records when the fiscal decision was made, not when we sent.
+     * - Only hash and metadata.fecha_hora_huso are updated (they are technically tied to the
+     *   transmission timestamp, not to the issuance decision).
+     * - The previous hash value is preserved in metadata.original_hash for audit trail.
+     * - Chain propagation to pending records is logged in metadata.hash_refreshed_at.
+     */
     private function refreshTimestampAndHash(VerifactuRecord $record): void
     {
-        $newIssuedAt      = Carbon::now('UTC');
-        $newFechaHoraHuso = VerifactuHuellaComputer::formatTimestamp($newIssuedAt);
+        $now              = Carbon::now('UTC');
+        $newFechaHoraHuso = VerifactuHuellaComputer::formatTimestamp($now);
         $oldHash          = $record->hash;
         $huellaComputer   = new VerifactuHuellaComputer();
         $companyNif       = $record->snapshot['company']['tax_number'] ?? '';
@@ -159,18 +170,36 @@ class AeatSandboxDriver implements VerifactuDriverInterface
             );
         }
 
-        $metadata                    = $record->metadata ?? [];
-        $metadata['fecha_hora_huso'] = $newFechaHoraHuso;
-        $record->metadata            = $metadata;
-        $record->hash                = $newHash;
-        $record->issued_at           = $newIssuedAt;
+        $metadata = $record->metadata ?? [];
+
+        // Preserve the original hash for audit trail before overwriting
+        if ($oldHash !== $newHash && empty($metadata['original_hash'])) {
+            $metadata['original_hash']          = $oldHash;
+            $metadata['original_fecha_hora_huso'] = $metadata['fecha_hora_huso'] ?? null;
+        }
+
+        $metadata['fecha_hora_huso']  = $newFechaHoraHuso;
+        $metadata['hash_refreshed_at'] = $now->toISOString();
+        $record->metadata             = $metadata;
+        $record->hash                 = $newHash;
+        // issued_at is intentionally NOT updated — it represents the fiscal issuance decision timestamp.
         $record->save();
 
-        // Propagate the new hash to any pending record that chains from this one
         if ($oldHash !== $newHash) {
-            VerifactuRecord::where('previous_hash', $oldHash)
+            // Propagate the updated hash to any pending record that chains from this one.
+            // Without this, chained records would carry a stale previous_hash and AEAT would reject them.
+            $affected = VerifactuRecord::where('previous_hash', $oldHash)
                 ->whereHas('submissions', fn ($q) => $q->whereIn('status', ['PENDING', 'FAILED']))
-                ->update(['previous_hash' => $newHash]);
+                ->get();
+
+            foreach ($affected as $chained) {
+                $chainedMeta = $chained->metadata ?? [];
+                $chainedMeta['previous_hash_updated_from'] = $oldHash;
+                $chainedMeta['previous_hash_updated_at']   = $now->toISOString();
+                $chained->metadata      = $chainedMeta;
+                $chained->previous_hash = $newHash;
+                $chained->save();
+            }
         }
     }
 

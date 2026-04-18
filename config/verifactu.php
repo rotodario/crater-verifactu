@@ -23,9 +23,19 @@ return [
     | Issue on send
     |--------------------------------------------------------------------------
     | Whether to fiscally issue the invoice automatically when it is sent
-    | (email) or marked as sent. Set to false to require manual issuance.
+    | (email) or marked as sent.
+    |
+    | ⚠️  Default is FALSE.
+    | Setting this to true means that clicking "Send invoice" immediately
+    | creates a VerifactuRecord, locks the invoice for editing, and queues
+    | a submission to AEAT. This is irreversible — any correction requires
+    | a full anulación + new invoice with a different number.
+    |
+    | Only set to true in production if your workflow guarantees that invoices
+    | are always final and confirmed before they are emailed to the client.
+    | The safer default is false: use the explicit "Expedir fiscalmente" button.
     */
-    'issue_on_send' => env('VERIFACTU_ISSUE_ON_SEND', true),
+    'issue_on_send' => env('VERIFACTU_ISSUE_ON_SEND', false),
 
     /*
     |--------------------------------------------------------------------------

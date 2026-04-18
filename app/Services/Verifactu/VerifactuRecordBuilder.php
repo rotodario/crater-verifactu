@@ -30,7 +30,12 @@ class VerifactuRecordBuilder
         // back it treats it as UTC and formatTimestamp converts it to Madrid,
         // producing a 2-hour offset → AEAT error 2000.
         $issuedAt = Carbon::now('UTC');
-        $previousRecord = VerifactuRecord::where('company_id', $invoice->company_id)
+
+        // Hash chain scope: installation, not just company.
+        // AEAT's chain is per NumeroInstalacion + NIF — if a company ever has more than one
+        // installation (e.g. sandbox and production were both active, or a reinstall happened)
+        // a company_id-only scope would incorrectly cross-pollinate chains between them.
+        $previousRecord = VerifactuRecord::where('verifactu_installation_id', $installation->id)
             ->latest('id')
             ->first();
 
