@@ -121,6 +121,14 @@ class AeatProductionDriver implements VerifactuDriverInterface
      */
     private function refreshTimestampAndHash(VerifactuRecord $record): void
     {
+        // Safety guard: never mutate a record that AEAT has already accepted.
+        // If somehow a PENDING/FAILED submission exists for an ACCEPTED record
+        // (e.g. network timeout where AEAT accepted but we never received the response),
+        // refreshing its hash would silently corrupt the chain anchor that AEAT already holds.
+        if ($record->status === 'ACCEPTED') {
+            return;
+        }
+
         $now              = Carbon::now('UTC');
         $newFechaHoraHuso = VerifactuHuellaComputer::formatTimestamp($now);
         $oldHash          = $record->hash;
