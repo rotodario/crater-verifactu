@@ -5,6 +5,7 @@ namespace Crater\Http\Controllers\V1\Admin\Verifactu;
 use Crater\Http\Controllers\Controller;
 use Crater\Models\VerifactuEvent;
 use Crater\Models\VerifactuInstallation;
+use Crater\Models\VerifactuPlatformConfig;
 use Crater\Models\VerifactuRecord;
 use Crater\Models\VerifactuSubmission;
 use Illuminate\Http\Request;
@@ -19,6 +20,7 @@ class DashboardController extends Controller
         $companyId = $request->header('company');
 
         $installation = VerifactuInstallation::where('company_id', $companyId)->first();
+        $platform     = VerifactuPlatformConfig::current();
 
         $recordQuery = VerifactuRecord::query()->where('company_id', $companyId);
         $submissionQuery = VerifactuSubmission::query()->where('company_id', $companyId);
@@ -96,8 +98,10 @@ class DashboardController extends Controller
                 'submission_driver'  => $effectiveMode,
                 'submission_enabled' => $installation ? (bool) $installation->submission_enabled : (bool) config('verifactu.submission_enabled'),
                 'issue_on_send'      => (bool) config('verifactu.issue_on_send'),
-                'software_name'      => config('verifactu.software.name'),
-                'software_version'   => config('verifactu.software.version'),
+                // Same source as Setup → Resumen tab: platform config from DB.
+                // Falls back to config/env only if the platform row hasn't been saved yet.
+                'software_name'      => $platform->software_name    ?: config('verifactu.software.name'),
+                'software_version'   => $platform->software_version ?: config('verifactu.software.version'),
             ],
             'summary' => [
                 'records_total' => (clone $recordQuery)->count(),
