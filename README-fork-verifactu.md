@@ -2,81 +2,211 @@
 
 ## Estado actual
 
-Este repositorio no es un Crater limpio. Es una copia restaurada desde hosting a local sobre la que se ha montado una capa fiscal VERI*FACTU desacoplada y una primera base de integracion AEAT preparada para evolucionar.
+Este repositorio es un fork de Crater (Laravel 8 / Vue 3 / Vite) con una capa fiscal VERI*FACTU completamente desacoplada del estado comercial de facturas, validada contra el entorno sandbox de AEAT.
 
-Fecha de actualizacion de este documento: 2026-04-15.
+Última actualización de este documento: **2026-04-18**.
 
-## Entorno actual
+---
 
-- Ruta local: `C:\xampp3\htdocs\crater`
-- Stack detectado: Laravel 8.83.16, PHP 8.1.12, Vue 3, Vite
-- Entorno de trabajo: local restaurado desde hosting
-- Alcance de pruebas realizadas: base de datos local de esta copia
-- Conexion AEAT real: no activa en produccion real
-- Drivers de submission disponibles: `shadow`, `stub`, `aeat_sandbox`, `aeat_production`
-- Modo configurado por defecto en este estado: revisar `config/verifactu.php` y `/admin/verifactu`
+## Entorno
 
-## Que se ha implementado ya
+| | |
+|---|---|
+| Ruta local | `C:\xampp3\htdocs\crater` |
+| Stack | Laravel 8.83, PHP 8.1, Vue 3, Vite |
+| Base de datos | MySQL (local restaurada desde hosting) |
+| Conexión AEAT sandbox | **Activa y validada** (prewww10.aeat.es) |
+| Conexión AEAT producción | Disponible; requiere configurar certificado de sello |
+| Modo por defecto | Revisar `config/verifactu.php` y `/admin/verifactu/setup` |
 
-- Estado fiscal independiente del estado comercial en facturas.
-- Expedicion fiscal separada y registro interno VERI*FACTU.
-- Bloqueo de edicion y borrado tras expedicion fiscal.
-- Tablas `verifactu_*` para installations, records, submissions, events y declarations.
-- QR/payload y bloque PDF VERI*FACTU.
-- Pipeline de submissions con job, comando y scheduler.
-- Driver manager por modo (`shadow`, `stub`, `aeat_sandbox`, `aeat_production`).
-- Base de cliente AEAT con certificado mTLS, parser de respuesta SOAP/XML y builder XML.
-- Huella/hash encadenada para registros y persistencia de `tipo_factura`.
-- Rectificativas no destructivas base.
-- Numeracion separada para rectificativas.
-- Dashboard admin de VERI*FACTU con vistas de `Records`, `Submissions`, `Events` y `Setup`.
-- Reintento manual de submissions `FAILED` desde UI.
-- Captura de NIF/CIF (`tax_number`) en empresa y cliente para soporte fiscal.
-- Abilities/policy propias de VERI*FACTU (`view-verifactu`, `manage-verifactu`).
+---
 
-## Que no hace todavia
+## Qué está implementado y funcionando
 
-- No esta validado como integracion final homologada frente a AEAT.
-- No envia nada a Hacienda real mientras no se configure y active conscientemente un modo AEAT operativo.
-- No tiene todavia flujo completo de firma/certificado validado extremo a extremo contra AEAT.
-- No implementa aun rectificacion por diferencias con importes negativos o parciales.
-- No tiene todavia una pantalla admin de edicion segura de configuracion VERI*FACTU; la UI actual es sobre todo de observabilidad.
-- No hay todavia declaracion responsable operativa cerrada ni checklist final de cumplimiento por release.
+### Núcleo VERI*FACTU
 
-## Datos de prueba ya generados en esta copia local
+- Estado fiscal independiente del estado comercial (`fiscal_status` vs `status`).
+- Expedición fiscal y bloqueo de edición/borrado tras expedición.
+- Tablas: `verifactu_installations`, `verifactu_records`, `verifactu_submissions`, `verifactu_events`, `verifactu_declarations`, `verifactu_platform_config`.
+- Campos en `invoices`: `fiscal_status`, `fiscal_issued_at`, `fiscal_locked_at`, `verifactu_record_id`, `invoice_kind`, `original_invoice_id`, `rectification_type`, `rectification_reason`.
+- Huella/hash encadenada SHA-256 (RegistroAlta y RegistroBaja con sus respectivas fórmulas).
+- `tipo_factura` persistido: F1, F2, R4 (base rectificativas).
+- QR VERI*FACTU y bloque fiscal en PDF de facturas.
+- Pipeline de submissions: job, comando artisan y scheduler.
 
-- Se han creado registros `verifactu_*` reales en la base local.
-- Se emitio fiscalmente al menos una factura local para validacion.
-- Se genero al menos una rectificativa de prueba.
-- Se procesaron submissions `stub` aceptadas de prueba.
-- Se probo al menos un retry de submission `FAILED` de forma local.
+### Drivers de submission
 
-Esto significa que la copia local ya no es una restauracion virgen. Si se quiere maxima limpieza, conviene clonar la base antes de seguir con validaciones fuertes.
+| Driver | Descripción |
+|---|---|
+| `shadow` | Solo registra localmente, no envía |
+| `stub` | Simula envío y devuelve ACCEPTED local |
+| `aeat_sandbox` | Envía a `prewww10.aeat.es` (homologación) |
+| `aeat_production` | Envía a `www10.aeat.es` (producción real) |
+
+Ambos drivers AEAT auto-seleccionan el endpoint correcto (persona física `www1`/`prewww1` vs certificado de sello `www10`/`prewww10`) inspeccionando el certificado.
+
+### Comunicación AEAT real
+
+- `AeatHttpClient`: cliente SOAP mTLS con certificado PKCS12 (.p12/.pfx) o PEM.
+- `AeatResponseParser`: parsea respuesta SOAP, extrae CSV, estado y errores por línea.
+- `VerifactuXmlBuilder`: genera XML `RegistroAlta` y `RegistroBaja` completos.
+- `VerifactuHuellaComputer`: SHA-256 con el string canónico correcto para Alta y Baja.
+- Certificados por empresa: subida, almacenamiento cifrado y contraseña cifrada en BD.
+- **Timestamp refresh antes de envío**: `refreshTimestampAndHash()` en ambos drivers AEAT renueva `FechaHoraHusoGenRegistro` y recomputa la huella justo antes de enviar, garantizando que el registro esté dentro de la ventana de 240 segundos de AEAT (evita error 2004).
+
+### Correcciones críticas AEAT validadas
+
+| Error AEAT | Causa | Fix |
+|---|---|---|
+| **2000** (huella incorrecta) | `computeBaja()` usaba nombres de campo sin sufijo `Anulada` | Hash y XML de RegistroBaja usan `IDEmisorFacturaAnulada`, `NumSerieFacturaAnulada`, `FechaExpedicionFacturaAnulada` |
+| **2004** (timestamp fuera de ventana) | Hash computado al crear el record, enviado más tarde | `refreshTimestampAndHash()` en drivers AEAT antes de enviar |
+| **3000** (duplicado) | AEAT bloquea permanentemente NIF+NumSerie+Fecha aunque haya anulación previa | Sufijado automático: `010426 → 010426B → 010426C` |
+
+### Arquitectura multi-tenant SIF
+
+```
+Plataforma (global, una fila)
+├── IdSistemaInformatico  ← verifactu_platform_config
+├── vendor_name / vendor_tax_id / vendor_address
+└── software_name / software_version
+
+Por empresa (independiente)
+├── Certificado digital (.p12/.pfx/.pem)
+├── issuer_name / issuer_tax_id (NIF del obligado)
+└── installation_number
+```
+
+En el XML: `SistemaInformatico` usa datos de plataforma; `ObligadoEmision` usa datos de empresa.
+
+### Panel de administración VERI*FACTU (`/admin/verifactu`)
+
+Navegación por secciones con `SectionNav.vue`:
+
+**Records** — lista de registros fiscales con estado, tipo, hash, submissions anidadas.
+
+**Submissions** — lista de envíos con XML request/response, estado, CSV AEAT. Reintento manual de submissions `FAILED`.
+
+**Events** — log de eventos fiscales (expedición, anulación, reparación, etc.).
+
+**Historial AEAT** (`/admin/verifactu/historial-aeat`) — consulta el libro registro en AEAT directamente por ejercicio/periodo. Muestra los registros que AEAT tiene, con su estado y huella.
+
+**Reconciliación AEAT** (`/admin/verifactu/reconciliacion-aeat`) — cruza registros locales con los de AEAT por ejercicio/periodo y detecta discrepancias.
+
+Estados de reconciliación:
+| Estado | Significado |
+|---|---|
+| `OK` | Local y AEAT coinciden |
+| `MISMATCH` | Existe en ambos pero con diferencias de hash/estado |
+| `CHAIN_ERROR` | AEAT aceptó con error 2000 (huella incorrecta) |
+| `ACCEPTED_WITH_ERRORS` | AEAT aceptó con avisos pero sin error 2000 |
+| `REJECTED` | AEAT rechazó el registro |
+| `ANNULLED` | Anulado correctamente en AEAT |
+| `LOCAL_ONLY` | Existe localmente pero no en AEAT |
+| `REMOTE_ONLY` | Existe en AEAT pero no hay record local |
+| `ACKNOWLEDGED` | REMOTE_ONLY reconocido manualmente (sin acción requerida) |
+| `PENDING_REVIEW` | Marcado para revisión manual |
+
+Acciones disponibles desde el panel:
+- **Anular y reenviar** (CHAIN_ERROR): crea RegistroBaja + nueva Alta con número sufijado automáticamente.
+- **Reparar sin local** (REMOTE_ONLY con Invoice local): acepta la huella remota AEAT como ancla, crea anulación + nueva Alta con número sufijado.
+- **Reconocer** (REMOTE_ONLY): marca como ACKNOWLEDGED en `installation.metadata`.
+- **Reenviar a AEAT**: crea nueva submission para un record existente.
+- **Marcar revisión**: anota el record con motivo para revisión manual.
+
+### Sufijado automático de número de factura
+
+Al reparar (anular + reenviar) se renombra la factura automáticamente para evitar el error 3000:
+- Se busca la primera letra B–Z no usada en `verifactu_records` ni `invoices` para esa empresa.
+- `010426` → `010426B` → `010426C` → …
+- La anulación usa el número original (lo que AEAT tiene registrado).
+- La nueva Alta usa el número sufijado.
+- `Invoice.invoice_number` se actualiza en la BD y el snapshot se reconstruye.
+
+### Declaración Responsable del SIF
+
+Ciclo de vida completo con estados `DRAFT → GENERATED → REVIEWED → ACTIVE → ARCHIVED`:
+- Una sola declaración `ACTIVE` a la vez; al activar una nueva, la anterior queda `ARCHIVED`.
+- Snapshot de datos de plataforma congelado al pasar a `GENERATED`.
+- PDF descargable desde estado `GENERATED` en adelante (`/verifactu/declarations/{id}/pdf`).
+- Nivel plataforma (`company_id = NULL`), no por empresa.
+
+### Setup (`/admin/verifactu/setup`)
+
+5 pestañas:
+1. **Resumen** — badges de estado, info emisor, estado certificado, últimas declaraciones.
+2. **Plataforma SIF** — `VerifactuPlatformConfig`: `software_name`, `software_version`, `vendor_name`, `vendor_tax_id`, `software_id`. Solo editable por superadmin.
+3. **Configuración empresa** — datos de la instalación por empresa.
+4. **Certificados** — subida/eliminación de certificado digital AEAT por empresa.
+5. **Declaraciones** — gestión del ciclo de vida de la DR.
+
+### Dashboard contable
+
+Las facturas con `fiscal_status = 'ANNULLED'` quedan **excluidas** de todos los cálculos del dashboard: gráfico mensual de ventas, total ventas, total facturas, total pendiente de cobro y facturas recientes.
+
+### Rectificativas (base)
+
+- Numeración separada para rectificativas.
+- `tipo_factura` R4 para rectificativas genéricas.
+- No destructivas: la factura original queda bloqueada.
+
+### SMTP por empresa
+
+`CompanyMailService` registra mailers dinámicos `company_{id}` con contraseña cifrada. Facturas, presupuestos y pagos usan el mailer de su empresa.
+
+### Permisos
+
+| Acción | Requiere |
+|---|---|
+| Ver cualquier cosa VERI*FACTU | `view-verifactu` |
+| Editar config empresa / certificados / records | `manage-verifactu` |
+| Editar Plataforma SIF / Declaraciones | `User::isOwner()` (superadmin) |
+
+---
+
+## Qué no hace todavía
+
+- **Rectificativas avanzadas**: falta implementar rectificación por diferencias (importes negativos/parciales) y el mapeo completo R1–R5.
+- **Homologación formal AEAT**: el sistema funciona contra sandbox pero no está certificado formalmente como SIF homologado.
+- **Cola persistente**: las submissions van con driver `sync`. Para producción real conviene migrar a Redis + Horizon para reintentos automáticos robustos.
+- **Producción real activa**: la conexión a `www10.aeat.es` está codificada pero requiere un certificado de sello válido en producción y activación consciente del modo `aeat_production`.
+- **Facturación simplificada F2**: no hay UI específica para facturas sin destinatario identificado.
+- **Agrupación de facturas**: no implementado el caso de RegistroAlta con múltiples facturas en un solo envío.
+
+---
+
+## Configuración clave (.env)
+
+```env
+VERIFACTU_ENABLED=true
+VERIFACTU_MODE=aeat_sandbox          # off | shadow | stub | aeat_sandbox | aeat_production
+VERIFACTU_SUBMISSION_ENABLED=true
+VERIFACTU_AEAT_SANDBOX_URL=https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP
+VERIFACTU_AEAT_SANDBOX_URL_SELLO=https://prewww10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP
+VERIFACTU_AEAT_PRODUCTION_URL=https://www1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP
+VERIFACTU_AEAT_PRODUCTION_URL_SELLO=https://www10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP
+VERIFACTU_CERT_PATH=                 # ruta a .p12/.pem (alternativa a certificado en BD)
+VERIFACTU_CERT_PASSWORD=
+```
+
+---
 
 ## Puntos de entrada importantes
 
-- Arquitectura tecnica: [docs/verifactu-architecture.md](docs/verifactu-architecture.md)
-- Roadmap operativo: [docs/verifactu-roadmap.md](docs/verifactu-roadmap.md)
-- Dashboard visible: `/admin/verifactu`
+- Dashboard VERI*FACTU: `/admin/verifactu`
+- Setup: `/admin/verifactu/setup`
+- Reconciliación AEAT: `/admin/verifactu/reconciliacion-aeat`
+- Historial AEAT: `/admin/verifactu/historial-aeat`
 - Config principal: `config/verifactu.php`
 - Commit base del fork: `ad81b53 chore: baseline restored crater fork with verifactu foundation`
 
-## Cambios recientes que no estaban bien reflejados
+---
 
-- Se anadio una capa de drivers VERI*FACTU con resolucion por modo en `VerifactuDriverManager`.
-- Se incorporo infraestructura AEAT temprana:
-  - `AeatHttpClient`
-  - `AeatResponseParser`
-  - `VerifactuXmlBuilder`
-  - `VerifactuHuellaComputer`
-  - `VerifactuPreSubmissionValidator`
-- `VerifactuService` ya valida antes de expedir y no crea el registro si faltan datos fiscales minimos.
-- `VerifactuRecordBuilder` ahora snapshottea `tax_number` de empresa/cliente y calcula `tipo_factura` + huella.
-- `verifactu_submissions` pasa a contemplar XML y CSV AEAT.
-- La UI ya tiene observabilidad bastante completa: records, submissions, events, setup y detalle de declaraciones.
+## Notas técnicas
 
-## Recomendacion para retomar trabajo
-
-1. Confirmar el modo visible en `/admin/verifactu` y en `config/verifactu.php`.
-2. Revisar los cambios pendientes sin commit posteriores al baseline `ad81b53`.
-3. Agrupar esos cambios en commits pequenos y legibles antes de seguir ampliando funcionalidad.
+- `isFiscalLocked()`: `fiscal_locked_at IS NOT NULL` — bloquea edición/borrado.
+- `VerifactuPlatformConfig::current()` siempre devuelve objeto con defaults aunque no exista fila en BD.
+- QR VERI*FACTU requiere extensión GD habilitada en `php.ini`.
+- DomPDF `@page` margins: DomPDF 1.x requiere al menos 2 reglas `@page` (`:first`, `:left`, `:right`) para aplicar márgenes en todas las páginas.
+- SimpleXMLElement: los nodos contenedor (sin texto) son falsy — usar `!== null`, nunca ternario directo.
+- Registros `CANCELLED`/`FAILED` son historial inerte — no borrar, no interfieren con la cadena activa.
+- La huella de RegistroBaja usa `IDEmisorFacturaAnulada`, `NumSerieFacturaAnulada`, `FechaExpedicionFacturaAnulada` (distinto de RegistroAlta).
