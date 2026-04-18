@@ -42,16 +42,15 @@ class VerifactuDeclarationService
         $platform = VerifactuPlatformConfig::current();
         $version  = $platform->software_version ?: config('verifactu.software.version');
 
-        // Block: a declaration for this exact version is already in progress
-        $inProgress = VerifactuDeclaration::whereNull('company_id')
+        // If a declaration for this exact version is already in progress, return it (idempotent).
+        $existing = VerifactuDeclaration::whereNull('company_id')
             ->whereIn('status', ['DRAFT', 'GENERATED', 'REVIEWED'])
             ->where('software_version', $version)
-            ->exists();
+            ->latest('id')
+            ->first();
 
-        if ($inProgress) {
-            throw new \RuntimeException(
-                "Ya existe una declaración en curso para la versión {$version}. Complétala o archívala antes de crear una nueva."
-            );
+        if ($existing) {
+            return $existing;
         }
 
         // Archive stale in-progress declarations from a previous/different version.

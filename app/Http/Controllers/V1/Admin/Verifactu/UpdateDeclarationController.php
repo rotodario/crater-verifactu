@@ -29,7 +29,7 @@ class UpdateDeclarationController extends Controller
         'GENERATED' => ['REVIEWED', 'DRAFT'],
         'REVIEWED'  => ['ACTIVE', 'DRAFT'],
         'ACTIVE'    => [],      // archived automatically when a new declaration reaches ACTIVE
-        'ARCHIVED'  => [],
+        'ARCHIVED'  => ['ACTIVE'],  // can be restored as active (re-activates the old declaration)
     ];
 
     public function __invoke(Request $request, VerifactuDeclaration $declaration)

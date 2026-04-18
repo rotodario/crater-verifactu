@@ -274,9 +274,18 @@ Route::prefix('/v1')->group(function () {
             Route::put('/verifactu/platform', VerifactuUpdatePlatformConfigController::class);
             Route::post('/verifactu/declarations', VerifactuCreateDeclarationController::class);
             Route::put('/verifactu/declarations/{declaration}', VerifactuUpdateDeclarationController::class);
+            Route::delete('/verifactu/declarations/{declaration}', \Crater\Http\Controllers\V1\Admin\Verifactu\DeleteDeclarationController::class);
             Route::post('/verifactu/certificate', VerifactuUploadCertificateController::class);
             Route::delete('/verifactu/certificate', VerifactuDeleteCertificateController::class);
             Route::post('/verifactu/submissions/{submission}/retry', VerifactuRetrySubmissionController::class);
+            Route::post('/verifactu/records/{record}/verify', \Crater\Http\Controllers\V1\Admin\Verifactu\VerifactuVerifyRecordController::class);
+            Route::post('/verifactu/historial', \Crater\Http\Controllers\V1\Admin\Verifactu\VerifactuHistorialController::class);
+            Route::post('/verifactu/reconciliacion', \Crater\Http\Controllers\V1\Admin\Verifactu\VerifactuReconciliacionController::class);
+            Route::post('/verifactu/reconciliacion/acknowledge', \Crater\Http\Controllers\V1\Admin\Verifactu\VerifactuAcknowledgeRemoteController::class);
+            Route::post('/verifactu/reconciliacion/repair-no-local', \Crater\Http\Controllers\V1\Admin\Verifactu\VerifactuRepairNoLocalController::class);
+            Route::post('/verifactu/records/{record}/mark-review', \Crater\Http\Controllers\V1\Admin\Verifactu\VerifactuMarkReviewController::class);
+            Route::post('/verifactu/records/{record}/repair-chain', \Crater\Http\Controllers\V1\Admin\Verifactu\VerifactuRepairChainController::class);
+            Route::post('/verifactu/sandbox-reset', \Crater\Http\Controllers\V1\Admin\Verifactu\VerifactuSandboxResetController::class);
             Route::get('/verifactu/records/{record}', VerifactuShowRecordController::class);
             Route::get('/verifactu/submissions/{submission}', VerifactuShowSubmissionController::class);
             Route::get('/verifactu/events/{event}', VerifactuShowEventController::class);

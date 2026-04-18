@@ -8,6 +8,7 @@ use Crater\Models\VerifactuSubmission;
 use Crater\Services\Verifactu\AeatHttpClient;
 use Crater\Services\Verifactu\AeatResponseParser;
 use Crater\Services\Verifactu\Drivers\Contracts\VerifactuDriverInterface;
+use Crater\Services\Verifactu\VerifactuHuellaComputer;
 use Crater\Services\Verifactu\VerifactuXmlBuilder;
 use RuntimeException;
 
@@ -38,6 +39,11 @@ class AeatSandboxDriver implements VerifactuDriverInterface
 
         $record->loadMissing(['installation']);
         $this->ensureConfig($record->installation);
+
+        // 0. Refresh FechaHoraHusoGenRegistro and recompute hash just before sending.
+        //    AEAT requires the timestamp to be within 240 seconds of its own clock.
+        //    If the record was created/queued earlier its stored timestamp may be stale.
+        $this->refreshTimestampAndHash($record);
 
         // 1. Build SOAP XML
         $xmlBuilder = new VerifactuXmlBuilder();
@@ -110,6 +116,61 @@ class AeatSandboxDriver implements VerifactuDriverInterface
         } else {
             $errorSummary = $parser->summariseErrors($parsed);
             throw new RuntimeException('AEAT sandbox rejected submission: ' . $errorSummary);
+        }
+    }
+
+    /**
+     * Refresh FechaHoraHusoGenRegistro and recompute the Huella just before
+     * sending so the timestamp is always within AEAT's 240-second window.
+     *
+     * If the hash changes (because the timestamp changed), any pending record
+     * that chains from this one has its previous_hash updated automatically.
+     */
+    private function refreshTimestampAndHash(VerifactuRecord $record): void
+    {
+        $newIssuedAt      = Carbon::now('UTC');
+        $newFechaHoraHuso = VerifactuHuellaComputer::formatTimestamp($newIssuedAt);
+        $oldHash          = $record->hash;
+        $huellaComputer   = new VerifactuHuellaComputer();
+        $companyNif       = $record->snapshot['company']['tax_number'] ?? '';
+        $invoiceDate      = VerifactuHuellaComputer::formatInvoiceDate(
+            \Carbon\Carbon::parse($record->invoice_date)
+        );
+
+        if ($record->record_type === 'invoice_cancellation') {
+            $newHash = $huellaComputer->computeBaja(
+                issuerNif:      $companyNif,
+                invoiceNumber:  $record->invoice_number,
+                invoiceDate:    $invoiceDate,
+                previousHuella: $record->previous_hash,
+                fechaHoraHuso:  $newFechaHoraHuso,
+            );
+        } else {
+            $meta    = $record->metadata ?? [];
+            $newHash = $huellaComputer->compute(
+                issuerNif:      $companyNif,
+                invoiceNumber:  $record->invoice_number,
+                invoiceDate:    $invoiceDate,
+                tipoFactura:    $record->tipo_factura ?? 'F1',
+                cuotaTotal:     $meta['cuota_total']  ?? '0.00',
+                importeTotal:   $meta['importe_total'] ?? '0.00',
+                previousHuella: $record->previous_hash,
+                fechaHoraHuso:  $newFechaHoraHuso,
+            );
+        }
+
+        $metadata                    = $record->metadata ?? [];
+        $metadata['fecha_hora_huso'] = $newFechaHoraHuso;
+        $record->metadata            = $metadata;
+        $record->hash                = $newHash;
+        $record->issued_at           = $newIssuedAt;
+        $record->save();
+
+        // Propagate the new hash to any pending record that chains from this one
+        if ($oldHash !== $newHash) {
+            VerifactuRecord::where('previous_hash', $oldHash)
+                ->whereHas('submissions', fn ($q) => $q->whereIn('status', ['PENDING', 'FAILED']))
+                ->update(['previous_hash' => $newHash]);
         }
     }
 

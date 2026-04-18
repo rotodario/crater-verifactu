@@ -795,6 +795,18 @@
                 </BaseButton>
               </div>
 
+              <!-- DRAFT — puede borrarse -->
+              <div v-if="dec.status === 'DRAFT'" class="flex flex-wrap gap-2 mt-2">
+                <BaseButton
+                  variant="danger"
+                  size="sm"
+                  :loading="deletingDeclaration[dec.id]"
+                  @click="onDeleteDeclaration(dec)"
+                >
+                  Borrar borrador
+                </BaseButton>
+              </div>
+
               <!-- ACTIVE — declaración vigente, sin acciones manuales -->
               <div v-if="dec.status === 'ACTIVE'">
                 <p class="text-xs text-green-700 font-medium">
@@ -802,13 +814,81 @@
                 </p>
               </div>
 
-              <!-- ARCHIVED — sin acciones -->
-              <div v-if="dec.status === 'ARCHIVED'">
+              <!-- ARCHIVED — puede restaurarse como vigente -->
+              <div v-if="dec.status === 'ARCHIVED'" class="space-y-1">
                 <p class="text-xs text-gray-400">Archivada. Superada por una declaración más reciente.</p>
+                <BaseButton
+                  variant="primary-outline"
+                  size="sm"
+                  :loading="updatingDeclaration[dec.id] === 'ACTIVE'"
+                  @click="onUpdateDeclaration(dec, 'ACTIVE')"
+                >
+                  Restaurar como vigente
+                </BaseButton>
               </div>
             </div>
           </BaseCard>
         </div>
+      </div>
+
+      <!-- ── ZONA PELIGROSA ── -->
+      <div v-if="activeTab === 'peligro'">
+        <BaseCard>
+          <template #header>
+            <h3 class="font-semibold text-red-700">Zona peligrosa</h3>
+          </template>
+
+          <!-- Blocked in production -->
+          <div v-if="installation?.mode === 'aeat_production'"
+            class="flex items-start gap-3 p-4 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+            <BaseIcon name="ExclamationIcon" class="h-5 w-5 shrink-0 mt-0.5 text-red-500" />
+            <div>
+              <p class="font-semibold">No disponible en modo producción AEAT</p>
+              <p class="mt-0.5">El reset del sistema está bloqueado mientras el modo sea <span class="font-mono">aeat_production</span>. Cambia a sandbox o stub antes de usarlo.</p>
+            </div>
+          </div>
+
+          <div v-else class="space-y-6">
+            <!-- Reset card -->
+            <div class="border border-red-200 rounded-lg p-5">
+              <h4 class="text-base font-semibold text-red-800">Resetear sistema VERI*FACTU completo</h4>
+              <p class="mt-1 text-sm text-gray-600">
+                Elimina todos los registros, submissions y eventos VERI*FACTU de esta empresa, y resetea todas las facturas a estado <span class="font-mono text-xs bg-gray-100 px-1 rounded">NOT_ISSUED</span>
+                para que puedan volver a ser expedidas fiscalmente desde cero con una cadena de huellas limpia.
+              </p>
+              <ul class="mt-3 text-sm text-gray-500 space-y-1 list-disc list-inside">
+                <li>Se borran todos los <strong>verifactu_records</strong> de la empresa</li>
+                <li>Se borran todos los <strong>submissions</strong> y <strong>eventos</strong> asociados</li>
+                <li>Todas las facturas vuelven a <strong>NOT_ISSUED</strong> (las anuladas no se tocan)</li>
+                <li>Los CSV emitidos por la AEAT en sandbox <strong>no tienen validez legal</strong>, así que esta operación no tiene consecuencias fiscales</li>
+              </ul>
+              <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                <strong>Nota sobre el sandbox AEAT:</strong> Esta operación limpia tu BD local. El sandbox de la AEAT puede conservar los registros anteriores — las re-emisiones de las mismas facturas recibirán error 3000 (duplicado) a menos que uses el <a href="https://www.agenciatributaria.gob.es" target="_blank" class="underline">portal de pruebas AEAT</a> para limpiar también el entorno de pruebas, o uses facturas con numeración nueva.
+              </div>
+
+              <div class="mt-5">
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Escribe <span class="font-mono font-bold text-red-700">RESETEAR</span> para confirmar
+                </label>
+                <div class="flex items-center gap-3">
+                  <input
+                    v-model="resetConfirmText"
+                    type="text"
+                    placeholder="RESETEAR"
+                    class="px-3 py-2 text-sm border border-red-300 rounded-md font-mono focus:outline-none focus:ring-2 focus:ring-red-400 w-40"
+                  />
+                  <BaseButton
+                    variant="danger"
+                    :disabled="resetConfirmText !== 'RESETEAR' || resetting"
+                    @click="onSandboxReset"
+                  >
+                    {{ resetting ? 'Reseteando...' : 'Resetear sistema' }}
+                  </BaseButton>
+                </div>
+              </div>
+            </div>
+          </div>
+        </BaseCard>
       </div>
 
     </div>
@@ -838,9 +918,12 @@ const savePlatformSuccess = ref(false)
 const saveSuccess = ref(false)
 const creatingDeclaration = ref(false)
 const updatingDeclaration = reactive({}) // { [id]: status string | true }
+const deletingDeclaration = reactive({}) // { [id]: bool }
 const declarationNotes = reactive({})    // { [id]: string }
 const uploading = ref(false)
 const deletingCert = ref(false)
+const resetting = ref(false)
+const resetConfirmText = ref('')
 
 const installation = ref(null)
 const declarations = ref([])
@@ -896,6 +979,7 @@ const tabs = [
   { id: 'configuracion', label: 'Configuración empresa' },
   { id: 'certificados', label: 'Certificados' },
   { id: 'declaraciones', label: 'Declaraciones' },
+  { id: 'peligro', label: '⚠ Zona peligrosa' },
 ]
 
 const canManage = computed(() =>
@@ -1201,6 +1285,38 @@ async function onUpdateDeclaration(declaration, newStatus) {
     }
   } finally {
     delete updatingDeclaration[declaration.id]
+  }
+}
+
+async function onDeleteDeclaration(declaration) {
+  if (!confirm(`¿Borrar el borrador de declaración #${declaration.id}? Esta acción no se puede deshacer.`)) return
+  deletingDeclaration[declaration.id] = true
+  try {
+    await axios.delete(`/api/v1/verifactu/declarations/${declaration.id}`)
+    notificationStore.showNotification({ type: 'success', message: 'Declaración borrada.' })
+    await loadSetup()
+  } catch (error) {
+    handleError(error)
+  } finally {
+    delete deletingDeclaration[declaration.id]
+  }
+}
+
+async function onSandboxReset() {
+  if (resetConfirmText.value !== 'RESETEAR') return
+  resetting.value = true
+  try {
+    await axios.post('/api/v1/verifactu/sandbox-reset')
+    notificationStore.showNotification({
+      type: 'success',
+      message: 'Sistema VERI*FACTU reseteado. Todas las facturas listas para re-expedirse.',
+    })
+    resetConfirmText.value = ''
+    await loadSetup()
+  } catch (error) {
+    handleError(error)
+  } finally {
+    resetting.value = false
   }
 }
 

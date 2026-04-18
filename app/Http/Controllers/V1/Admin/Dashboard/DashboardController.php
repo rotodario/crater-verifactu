@@ -97,6 +97,7 @@ class DashboardController extends Controller
                     [$start->format('Y-m-d'), $end->format('Y-m-d')]
                 )
                 ->whereCompany()
+                ->where('fiscal_status', '!=', Invoice::FISCAL_STATUS_ANNULLED)
                 ->sum('base_total')
             );
             array_push(
@@ -136,6 +137,7 @@ class DashboardController extends Controller
             [$startDate->format('Y-m-d'), $start->format('Y-m-d')]
         )
             ->whereCompany()
+            ->where('fiscal_status', '!=', Invoice::FISCAL_STATUS_ANNULLED)
             ->sum('base_total');
 
         $total_receipts = Payment::whereBetween(
@@ -164,13 +166,16 @@ class DashboardController extends Controller
 
         $total_customer_count = Customer::whereCompany()->count();
         $total_invoice_count = Invoice::whereCompany()
+            ->where('fiscal_status', '!=', Invoice::FISCAL_STATUS_ANNULLED)
             ->count();
         $total_estimate_count = Estimate::whereCompany()->count();
         $total_amount_due = Invoice::whereCompany()
+            ->where('fiscal_status', '!=', Invoice::FISCAL_STATUS_ANNULLED)
             ->sum('base_due_amount');
 
         $recent_due_invoices = Invoice::with('customer')
             ->whereCompany()
+            ->where('fiscal_status', '!=', Invoice::FISCAL_STATUS_ANNULLED)
             ->where('base_due_amount', '>', 0)
             ->take(5)
             ->latest()

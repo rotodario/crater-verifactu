@@ -27,6 +27,8 @@ const items = [
   { label: 'Submissions', to: '/admin/verifactu/submissions', matcher: '/admin/verifactu/submissions' },
   { label: 'Events', to: '/admin/verifactu/events', matcher: '/admin/verifactu/events' },
   { label: 'Setup', to: '/admin/verifactu/setup', matcher: '/admin/verifactu/setup' },
+  { label: 'Historial AEAT', to: '/admin/verifactu/historial-aeat', matcher: '/admin/verifactu/historial-aeat' },
+  { label: 'Reconciliación AEAT', to: '/admin/verifactu/reconciliacion-aeat', matcher: '/admin/verifactu/reconciliacion-aeat' },
 ]
 
 function isActive(matcher) {

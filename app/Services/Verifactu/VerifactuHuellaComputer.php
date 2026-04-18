@@ -90,10 +90,14 @@ class VerifactuHuellaComputer
         ?string $previousHuella,
         string  $fechaHoraHuso
     ): string {
+        // VERI*FACTU spec: RegistroBaja hash formula uses the "Anulada" field name
+        // variants — different from RegistroAlta which uses plain field names.
+        // AEAT verifies: IDEmisorFacturaAnulada, NumSerieFacturaAnulada,
+        //                FechaExpedicionFacturaAnulada (NOT the plain versions).
         $input = implode('&', [
-            "IDEmisorFactura={$issuerNif}",
-            "NumSerieFactura={$invoiceNumber}",
-            "FechaExpedicionFactura={$invoiceDate}",
+            "IDEmisorFacturaAnulada={$issuerNif}",
+            "NumSerieFacturaAnulada={$invoiceNumber}",
+            "FechaExpedicionFacturaAnulada={$invoiceDate}",
             'Huella=' . ($previousHuella ?? ''),
             "FechaHoraHusoGenRegistro={$fechaHoraHuso}",
         ]);

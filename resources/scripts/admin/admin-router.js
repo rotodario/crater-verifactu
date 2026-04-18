@@ -123,6 +123,10 @@ const VerifactuEventView = () =>
   import('@/scripts/admin/views/verifactu/EventView.vue')
 const VerifactuDeclarationView = () =>
   import('@/scripts/admin/views/verifactu/DeclarationView.vue')
+const VerifactuHistorialAeatView = () =>
+  import('@/scripts/admin/views/verifactu/HistorialAeatView.vue')
+const VerifactuReconciliacionAeatView = () =>
+  import('@/scripts/admin/views/verifactu/ReconciliacionAeatView.vue')
 
 // Installation
 const Installation = () =>
@@ -568,6 +572,18 @@ export default [
         name: 'verifactu.declarations.view',
         meta: { ability: abilities.VIEW_VERIFACTU },
         component: VerifactuDeclarationView,
+      },
+      {
+        path: 'verifactu/historial-aeat',
+        name: 'verifactu.historial.aeat',
+        meta: { ability: abilities.VIEW_VERIFACTU },
+        component: VerifactuHistorialAeatView,
+      },
+      {
+        path: 'verifactu/reconciliacion-aeat',
+        name: 'verifactu.reconciliacion.aeat',
+        meta: { ability: abilities.VIEW_VERIFACTU },
+        component: VerifactuReconciliacionAeatView,
       },
     ],
   },

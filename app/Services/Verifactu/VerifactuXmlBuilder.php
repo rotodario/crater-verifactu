@@ -44,6 +44,17 @@ class VerifactuXmlBuilder
         $issuedAt    = $record->issued_at;
         $tipoFactura = $record->tipo_factura ?: 'F1';
 
+        // Use the timestamp string stored at record-creation time so it is
+        // guaranteed to match the one used to compute the Huella, regardless
+        // of any MySQL session-timezone distortion on issued_at round-trips.
+        $fechaHoraHusoStr = $record->metadata['fecha_hora_huso']
+            ?? VerifactuHuellaComputer::formatTimestamp($issuedAt);
+
+        // Use IVA-only amounts stored in metadata (IRPF/retentions excluded).
+        // These must be identical to what was used to compute the Huella.
+        $cuotaTotalStr  = $record->metadata['cuota_total']  ?? null;
+        $importeTotalStr = $record->metadata['importe_total'] ?? null;
+
         $dom = new DOMDocument('1.0', 'UTF-8');
         $dom->formatOutput = true;
 
@@ -143,13 +154,21 @@ class VerifactuXmlBuilder
             }
         }
 
-        // CuotaTotal / ImporteTotal
-        $this->addText($dom, $alta, 'sum:CuotaTotal',   self::NS_SUM,
-            VerifactuHuellaComputer::formatAmount((int) $invoice['tax_total'])
-        );
-        $this->addText($dom, $alta, 'sum:ImporteTotal', self::NS_SUM,
-            VerifactuHuellaComputer::formatAmount((int) $invoice['total'])
-        );
+        // CuotaTotal / ImporteTotal — use IVA-only amounts from metadata so they
+        // match the hash exactly and satisfy AEAT validation (error 2005).
+        // Fallback: compute on the fly from snapshot taxes (positive-rate only).
+        if ($cuotaTotalStr === null || $importeTotalStr === null) {
+            $ivaTotal = 0;
+            foreach ($taxes as $tax) {
+                if ((float) ($tax['percent'] ?? 0) > 0) {
+                    $ivaTotal += (int) ($tax['amount'] ?? 0);
+                }
+            }
+            $cuotaTotalStr  = VerifactuHuellaComputer::formatAmount($ivaTotal);
+            $importeTotalStr = VerifactuHuellaComputer::formatAmount((int) ($invoice['sub_total'] ?? 0) + $ivaTotal);
+        }
+        $this->addText($dom, $alta, 'sum:CuotaTotal',   self::NS_SUM, $cuotaTotalStr);
+        $this->addText($dom, $alta, 'sum:ImporteTotal', self::NS_SUM, $importeTotalStr);
 
         // Encadenamiento — MUST come before SistemaInformatico
         $encadenamiento = $dom->createElementNS(self::NS_SUM, 'sum:Encadenamiento');
@@ -160,9 +179,7 @@ class VerifactuXmlBuilder
         $this->buildSistemaInformatico($dom, $alta, $software, $company, $installation);
 
         // FechaHoraHusoGenRegistro / TipoHuella / Huella — after SistemaInformatico
-        $this->addText($dom, $alta, 'sum:FechaHoraHusoGenRegistro', self::NS_SUM,
-            VerifactuHuellaComputer::formatTimestamp($issuedAt)
-        );
+        $this->addText($dom, $alta, 'sum:FechaHoraHusoGenRegistro', self::NS_SUM, $fechaHoraHusoStr);
         $this->addText($dom, $alta, 'sum:TipoHuella', self::NS_SUM, '01');
         $this->addText($dom, $alta, 'sum:Huella',     self::NS_SUM, $record->hash);
 
@@ -184,6 +201,8 @@ class VerifactuXmlBuilder
         $software     = $snap['software'];
         $installation = $record->installation;
         $issuedAt     = $record->issued_at;
+        $fechaHoraHusoStr = $record->metadata['fecha_hora_huso']
+            ?? VerifactuHuellaComputer::formatTimestamp($issuedAt);
 
         $dom = new DOMDocument('1.0', 'UTF-8');
         $dom->formatOutput = true;
@@ -218,9 +237,9 @@ class VerifactuXmlBuilder
 
         $idFactura = $dom->createElementNS(self::NS_SUM, 'sum:IDFactura');
         $anulacion->appendChild($idFactura);
-        $this->addText($dom, $idFactura, 'sum:IDEmisorFactura',        self::NS_SUM, $company['tax_number'] ?? '');
-        $this->addText($dom, $idFactura, 'sum:NumSerieFactura',        self::NS_SUM, $invoice['number']);
-        $this->addText($dom, $idFactura, 'sum:FechaExpedicionFactura', self::NS_SUM,
+        $this->addText($dom, $idFactura, 'sum:IDEmisorFacturaAnulada',        self::NS_SUM, $company['tax_number'] ?? '');
+        $this->addText($dom, $idFactura, 'sum:NumSerieFacturaAnulada',        self::NS_SUM, $invoice['number']);
+        $this->addText($dom, $idFactura, 'sum:FechaExpedicionFacturaAnulada', self::NS_SUM,
             VerifactuHuellaComputer::formatInvoiceDate(\Carbon\Carbon::parse($invoice['date']))
         );
 
@@ -232,9 +251,7 @@ class VerifactuXmlBuilder
         // SistemaInformatico
         $this->buildSistemaInformatico($dom, $anulacion, $software, $company, $installation);
 
-        $this->addText($dom, $anulacion, 'sum:FechaHoraHusoGenRegistro', self::NS_SUM,
-            VerifactuHuellaComputer::formatTimestamp($issuedAt)
-        );
+        $this->addText($dom, $anulacion, 'sum:FechaHoraHusoGenRegistro', self::NS_SUM, $fechaHoraHusoStr);
         $this->addText($dom, $anulacion, 'sum:TipoHuella', self::NS_SUM, '01');
         $this->addText($dom, $anulacion, 'sum:Huella',     self::NS_SUM, $record->hash);
 
@@ -248,15 +265,20 @@ class VerifactuXmlBuilder
         if (! $record->previous_hash) {
             $this->addText($dom, $parent, 'sum:PrimerRegistro', self::NS_SUM, 'S');
         } else {
+            // Try to find the previous record locally by its hash.
+            // When previous_hash comes from a remote AEAT record (e.g. repair-no-local flow),
+            // there may be no local counterpart — fall back to the record's own snapshot data.
             $prev        = \Crater\Models\VerifactuRecord::where('hash', $record->previous_hash)->first();
             $regAnterior = $dom->createElementNS(self::NS_SUM, 'sum:RegistroAnterior');
             $parent->appendChild($regAnterior);
             $this->addText($dom, $regAnterior, 'sum:IDEmisorFactura',        self::NS_SUM, $company['tax_number'] ?? '');
-            $this->addText($dom, $regAnterior, 'sum:NumSerieFactura',        self::NS_SUM, optional($prev)->invoice_number ?? '');
+            $this->addText($dom, $regAnterior, 'sum:NumSerieFactura',        self::NS_SUM,
+                optional($prev)->invoice_number ?? ($record->snapshot['invoice']['number'] ?? $record->invoice_number)
+            );
             $this->addText($dom, $regAnterior, 'sum:FechaExpedicionFactura', self::NS_SUM,
                 $prev && $prev->invoice_date
                     ? VerifactuHuellaComputer::formatInvoiceDate(\Carbon\Carbon::parse($prev->invoice_date))
-                    : ''
+                    : VerifactuHuellaComputer::formatInvoiceDate(\Carbon\Carbon::parse($record->invoice_date))
             );
             $this->addText($dom, $regAnterior, 'sum:Huella', self::NS_SUM, $record->previous_hash);
         }

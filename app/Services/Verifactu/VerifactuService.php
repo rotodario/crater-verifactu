@@ -120,12 +120,13 @@ class VerifactuService
 
         // Build a cancellation record using the same snapshot as the original
         $originalRecord = $invoice->verifactuRecord;
-        $issuedAt       = \Carbon\Carbon::now();
+        $issuedAt       = \Carbon\Carbon::now('UTC'); // must be UTC — see VerifactuRecordBuilder
 
         $previousRecord = \Crater\Models\VerifactuRecord::where('company_id', $invoice->company_id)
             ->latest('id')
             ->first();
 
+        $fechaHoraHuso  = VerifactuHuellaComputer::formatTimestamp($issuedAt);
         $huellaComputer = new VerifactuHuellaComputer();
         $huella = $huellaComputer->computeBaja(
             issuerNif:      $invoice->company->tax_number ?? '',
@@ -134,7 +135,7 @@ class VerifactuService
                                 $invoice->invoice_date ?? $issuedAt
                             ),
             previousHuella: optional($previousRecord)->hash,
-            fechaHoraHuso:  VerifactuHuellaComputer::formatTimestamp($issuedAt),
+            fechaHoraHuso:  $fechaHoraHuso,
         );
 
         $record = \Crater\Models\VerifactuRecord::create([
@@ -152,7 +153,10 @@ class VerifactuService
             'issued_at'                => $issuedAt,
             'locked_at'                => $issuedAt,
             'snapshot'                 => $originalRecord ? $originalRecord->snapshot : [],
-            'metadata'                 => ['cancellation_of_record_id' => optional($originalRecord)->id],
+            'metadata'                 => [
+                'cancellation_of_record_id' => optional($originalRecord)->id,
+                'fecha_hora_huso'           => $fechaHoraHuso,
+            ],
         ]);
 
         $this->stateManager->markAnnulled($invoice);

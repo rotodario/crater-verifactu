@@ -102,21 +102,100 @@
               <td class="py-3 pr-4">{{ submission.driver || '-' }}</td>
               <td class="py-3 pr-4 font-mono text-xs text-green-700 font-semibold">{{ submission.csv || '-' }}</td>
               <td class="py-3 pr-4">
-                <BaseButton
-                  v-if="submission.status === 'FAILED'"
-                  size="sm"
-                  variant="primary-outline"
-                  :disabled="retryingId === submission.id"
-                  @click="retrySubmission(submission.id)"
-                >
-                  {{ retryingId === submission.id ? 'Reintentando...' : 'Retry' }}
-                </BaseButton>
-                <span v-else class="text-xs text-gray-400">-</span>
+                <div class="flex gap-2 flex-wrap">
+                  <BaseButton
+                    v-if="submission.status === 'FAILED'"
+                    size="sm"
+                    variant="primary-outline"
+                    :disabled="retryingId === submission.id"
+                    @click="retrySubmission(submission.id)"
+                  >
+                    {{ retryingId === submission.id ? 'Reintentando...' : 'Retry' }}
+                  </BaseButton>
+                  <BaseButton
+                    v-if="submission.record_id && (submission.driver === 'aeat_sandbox' || submission.driver === 'aeat_production')"
+                    size="sm"
+                    variant="white"
+                    :disabled="verifyingId === submission.record_id"
+                    @click="verifyRecord(submission.record_id)"
+                  >
+                    {{ verifyingId === submission.record_id ? 'Consultando...' : 'Verificar AEAT' }}
+                  </BaseButton>
+                </div>
               </td>
               <td class="py-3">{{ submission.completed_at || submission.submitted_at || submission.created_at || '-' }}</td>
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Verify AEAT result panel -->
+      <div v-if="verifyResult" class="mt-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+        <div class="flex items-center justify-between mb-3">
+          <h4 class="text-sm font-semibold text-gray-800">Resultado ConsultaFactuSistemaFacturacion — Record #{{ verifyResult.recordId }}</h4>
+          <button class="text-gray-400 hover:text-gray-600 text-xs" @click="verifyResult = null">✕ Cerrar</button>
+        </div>
+
+        <div v-if="!verifyResult.result.found" class="text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-3">
+          <strong>SinDatos</strong> — La AEAT no encontró este registro en el sistema de facturación.
+          <span v-if="verifyResult.result.raw_error" class="block mt-1 text-xs">{{ verifyResult.result.raw_error }}</span>
+        </div>
+
+        <div v-else>
+          <div v-for="(rec, idx) in verifyResult.result.records" :key="idx" class="mb-3 last:mb-0 p-3 bg-white border border-gray-200 rounded">
+            <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+              <div>
+                <span class="text-gray-500">Factura:</span>
+                <span class="ml-1 font-medium text-gray-900">{{ rec.invoice_number || '-' }}</span>
+              </div>
+              <div>
+                <span class="text-gray-500">Fecha:</span>
+                <span class="ml-1 text-gray-700">{{ rec.invoice_date || '-' }}</span>
+              </div>
+              <div>
+                <span class="text-gray-500">Estado AEAT:</span>
+                <span class="ml-1 font-semibold" :class="rec.estado_registro === 'Correcto' ? 'text-green-700' : rec.estado_registro === 'Anulado' ? 'text-red-600' : 'text-yellow-700'">
+                  {{ rec.estado_registro || '-' }}
+                </span>
+              </div>
+              <div>
+                <span class="text-gray-500">Hash match:</span>
+                <span v-if="rec.hash_match === true" class="ml-1 text-green-700 font-semibold">✓ Coincide</span>
+                <span v-else-if="rec.hash_match === false" class="ml-1 text-red-600 font-semibold">✗ No coincide</span>
+                <span v-else class="ml-1 text-gray-400">-</span>
+              </div>
+              <div class="col-span-2">
+                <span class="text-gray-500">Huella AEAT:</span>
+                <span class="ml-1 font-mono text-xs text-gray-700">{{ rec.huella ? rec.huella.substring(0, 32) + '…' : '-' }}</span>
+              </div>
+              <div>
+                <span class="text-gray-500">IdPetición:</span>
+                <span class="ml-1 text-xs text-gray-600">{{ rec.id_peticion || '-' }}</span>
+              </div>
+              <div>
+                <span class="text-gray-500">Timestamp presentación:</span>
+                <span class="ml-1 text-xs text-gray-600">{{ rec.timestamp_presentacion || '-' }}</span>
+              </div>
+              <div v-if="rec.error_code" class="col-span-2 mt-1 text-xs text-red-700 bg-red-50 rounded px-2 py-1">
+                Error {{ rec.error_code }}: {{ rec.error_desc }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <details class="mt-3 text-xs text-gray-500">
+          <summary class="cursor-pointer select-none">Ver XML de consulta / respuesta</summary>
+          <div class="mt-2 space-y-2">
+            <div>
+              <p class="font-medium text-gray-600 mb-1">Request XML:</p>
+              <pre class="overflow-x-auto bg-white border border-gray-200 rounded p-2 text-xs leading-4">{{ verifyResult.request_xml }}</pre>
+            </div>
+            <div>
+              <p class="font-medium text-gray-600 mb-1">Response XML:</p>
+              <pre class="overflow-x-auto bg-white border border-gray-200 rounded p-2 text-xs leading-4">{{ verifyResult.response_xml }}</pre>
+            </div>
+          </div>
+        </details>
       </div>
     </BaseCard>
   </BasePage>
@@ -131,6 +210,8 @@ import SectionNav from '@/scripts/admin/views/verifactu/components/SectionNav.vu
 
 const loading = ref(false)
 const retryingId = ref(null)
+const verifyingId = ref(null)
+const verifyResult = ref(null)
 const submissions = ref([])
 const notificationStore = useNotificationStore()
 const statusOptions = ['PENDING', 'PROCESSING', 'ACCEPTED', 'FAILED', 'REJECTED']
@@ -182,6 +263,20 @@ function resetFilters() {
   }
 
   loadSubmissions()
+}
+
+async function verifyRecord(recordId) {
+  verifyingId.value = recordId
+  verifyResult.value = null
+
+  try {
+    const response = await axios.post(`/api/v1/verifactu/records/${recordId}/verify`)
+    verifyResult.value = { recordId, ...response.data }
+  } catch (error) {
+    handleError(error)
+  } finally {
+    verifyingId.value = null
+  }
 }
 
 function getStatusBadgeColor(status) {

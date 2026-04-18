@@ -23,7 +23,13 @@ class VerifactuRecordBuilder
 
         $platform = VerifactuPlatformConfig::current();
 
-        $issuedAt = Carbon::now();
+        // Force UTC so that the timestamp stored in DB and the one used
+        // to compute the hash are always the same after round-trip through MySQL.
+        // Without this, Carbon::now() in a Europe/Madrid PHP timezone returns
+        // "+02:00" local time which MySQL stores as-is; when Laravel reads it
+        // back it treats it as UTC and formatTimestamp converts it to Madrid,
+        // producing a 2-hour offset → AEAT error 2000.
+        $issuedAt = Carbon::now('UTC');
         $previousRecord = VerifactuRecord::where('company_id', $invoice->company_id)
             ->latest('id')
             ->first();
@@ -114,6 +120,26 @@ class VerifactuRecordBuilder
             'invoice_kind' => $invoice->invoice_kind ?? null,
         ]);
 
+        // Compute the formatted timestamp ONCE and store it in metadata so the
+        // XML builder uses the exact same string — avoiding any timezone
+        // round-trip distortion that can occur when reading issued_at back
+        // from a MySQL TIMESTAMP column with a non-UTC session timezone.
+        $fechaHoraHuso = VerifactuHuellaComputer::formatTimestamp($issuedAt);
+
+        // VERI*FACTU CuotaTotal and ImporteTotal must reflect only positive-rate
+        // taxes (IVA). Retentions like IRPF (negative percent) reduce the payment
+        // amount but are NOT part of the AEAT fiscal desglose — including them
+        // causes error 2005 (ImporteTotal inconsistency).
+        $ivaTotal = 0;
+        foreach ($invoice->taxes as $tax) {
+            if ((float) $tax->percent > 0) {
+                $ivaTotal += (int) $tax->amount;
+            }
+        }
+        $subTotal          = (int) $invoice->sub_total;
+        $cuotaTotalFmt     = VerifactuHuellaComputer::formatAmount($ivaTotal);
+        $importeTotalFmt   = VerifactuHuellaComputer::formatAmount($subTotal + $ivaTotal);
+
         $huella = (new VerifactuHuellaComputer())->compute(
             issuerNif:       optional($invoice->company)->tax_number ?? '',
             invoiceNumber:   $invoice->invoice_number,
@@ -121,10 +147,10 @@ class VerifactuRecordBuilder
                                  $invoice->invoice_date ?? $issuedAt
                              ),
             tipoFactura:     $tipoFactura,
-            cuotaTotal:      VerifactuHuellaComputer::formatAmount((int) $invoice->tax),
-            importeTotal:    VerifactuHuellaComputer::formatAmount((int) $invoice->total),
+            cuotaTotal:      $cuotaTotalFmt,
+            importeTotal:    $importeTotalFmt,
             previousHuella:  optional($previousRecord)->hash,
-            fechaHoraHuso:   VerifactuHuellaComputer::formatTimestamp($issuedAt),
+            fechaHoraHuso:   $fechaHoraHuso,
         );
 
         return [
@@ -140,9 +166,12 @@ class VerifactuRecordBuilder
             'locked_at' => $issuedAt,
             'snapshot' => $snapshot,
             'metadata' => [
-                'source_status' => $invoice->status,
+                'source_status'    => $invoice->status,
                 'source_paid_status' => $invoice->paid_status,
                 'installation_mode' => $installation->mode,
+                'fecha_hora_huso'   => $fechaHoraHuso,
+                'cuota_total'       => $cuotaTotalFmt,
+                'importe_total'     => $importeTotalFmt,
             ],
         ];
     }
