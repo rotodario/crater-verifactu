@@ -45,6 +45,11 @@ class ShowSetupController extends Controller
 
         $platform = VerifactuPlatformConfig::current();
 
+        // The active declaration is the certified/frozen SIF identity actually used in AEAT submissions.
+        // PlatformConfig is the editable working copy — changes there only take effect after a new DR is activated.
+        $activeDeclaration = VerifactuDeclaration::whereNull('company_id')->where('status', 'ACTIVE')->first();
+        $activeSoftware = $activeDeclaration?->declaration_payload ?? null;
+
         return response()->json([
             'installation' => $installation ? [
                 'id'                 => $installation->id,
@@ -71,6 +76,16 @@ class ShowSetupController extends Controller
                 'software_id'      => $platform->software_id,
                 'exists'           => $platform->exists,
             ],
+            // What is ACTUALLY being sent to AEAT right now (from the active DR payload).
+            // Null if no DR is active — in that case PlatformConfig is used as fallback.
+            'active_software' => $activeSoftware ? [
+                'software_name'    => $activeSoftware['software_name']    ?? null,
+                'software_version' => $activeSoftware['software_version'] ?? null,
+                'software_id'      => $activeSoftware['software_id']      ?? null,
+                'vendor_name'      => $activeSoftware['vendor_name']      ?? null,
+                'vendor_tax_id'    => $activeSoftware['vendor_tax_id']    ?? null,
+                'declaration_id'   => $activeDeclaration->id,
+            ] : null,
             'declarations' => $declarations,
         ]);
     }

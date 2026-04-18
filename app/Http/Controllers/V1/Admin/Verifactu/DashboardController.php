@@ -19,8 +19,10 @@ class DashboardController extends Controller
 
         $companyId = $request->header('company');
 
-        $installation = VerifactuInstallation::where('company_id', $companyId)->first();
-        $platform     = VerifactuPlatformConfig::current();
+        $installation   = VerifactuInstallation::where('company_id', $companyId)->first();
+        $platform       = VerifactuPlatformConfig::current();
+        $activeDecl     = \Crater\Models\VerifactuDeclaration::whereNull('company_id')->where('status', 'ACTIVE')->first();
+        $activeDeclData = $activeDecl?->declaration_payload ?? [];
 
         $recordQuery = VerifactuRecord::query()->where('company_id', $companyId);
         $submissionQuery = VerifactuSubmission::query()->where('company_id', $companyId);
@@ -98,10 +100,11 @@ class DashboardController extends Controller
                 'submission_driver'  => $effectiveMode,
                 'submission_enabled' => $installation ? (bool) $installation->submission_enabled : (bool) config('verifactu.submission_enabled'),
                 'issue_on_send'      => (bool) config('verifactu.issue_on_send'),
-                // Same source as Setup → Resumen tab: platform config from DB.
-                // Falls back to config/env only if the platform row hasn't been saved yet.
-                'software_name'      => $platform->software_name    ?: config('verifactu.software.name'),
-                'software_version'   => $platform->software_version ?: config('verifactu.software.version'),
+                // Show what is ACTUALLY being sent to AEAT: active declaration → platform config → env.
+                'software_name'    => $activeDeclData['software_name']    ?? $platform->software_name    ?? config('verifactu.software.name'),
+                'software_version' => $activeDeclData['software_version'] ?? $platform->software_version ?? config('verifactu.software.version'),
+                'software_id'      => $activeDeclData['software_id']      ?? $platform->software_id      ?? config('verifactu.software.id'),
+                'active_declaration_id' => $activeDecl?->id,
             ],
             'summary' => [
                 'records_total' => (clone $recordQuery)->count(),

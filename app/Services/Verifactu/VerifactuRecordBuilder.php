@@ -3,6 +3,7 @@
 namespace Crater\Services\Verifactu;
 
 use Crater\Models\Invoice;
+use Crater\Models\VerifactuDeclaration;
 use Crater\Models\VerifactuInstallation;
 use Crater\Models\VerifactuPlatformConfig;
 use Crater\Models\VerifactuRecord;
@@ -22,6 +23,14 @@ class VerifactuRecordBuilder
         ]);
 
         $platform = VerifactuPlatformConfig::current();
+
+        // Use the ACTIVE declaration's frozen payload as source for SistemaInformatico.
+        // The Declaración Responsable is the certified snapshot of the SIF identity sent to AEAT.
+        // If PlatformConfig has been edited after the DR was generated, the DR still takes
+        // precedence — a new DR must be activated to make software identity changes take effect.
+        // Falls back to PlatformConfig if no declaration is active yet.
+        $activeDecl    = VerifactuDeclaration::whereNull('company_id')->where('status', 'ACTIVE')->first();
+        $activeDeclData = $activeDecl?->declaration_payload ?? [];
 
         // Force UTC so that the timestamp stored in DB and the one used
         // to compute the hash are always the same after round-trip through MySQL.
@@ -104,14 +113,16 @@ class VerifactuRecordBuilder
                 ];
             })->values()->toArray(),
             'software' => [
-                // Per-installation fields (company-specific)
-                'name'                => $installation->software_name     ?: $platform->software_name    ?: config('verifactu.software.name'),
-                'version'             => $installation->software_version   ?: $platform->software_version ?: config('verifactu.software.version'),
+                // SIF identity: active declaration payload → PlatformConfig → config/env.
+                // The active declaration is the certified snapshot; PlatformConfig is the editable
+                // working copy. Changes to PlatformConfig only take effect after a new DR is activated.
+                'name'    => $activeDeclData['software_name']  ?? $platform->software_name    ?? config('verifactu.software.name'),
+                'version' => $activeDeclData['software_version'] ?? $platform->software_version ?? config('verifactu.software.version'),
+                'software_id'   => $activeDeclData['software_id']   ?? $platform->software_id    ?? config('verifactu.software.id', 'CRATER-VF-01'),
+                'vendor_name'   => $activeDeclData['vendor_name']   ?? $platform->vendor_name    ?? config('verifactu.software.vendor_name'),
+                'vendor_tax_id' => $activeDeclData['vendor_tax_id'] ?? $platform->vendor_tax_id  ?? config('verifactu.software.vendor_tax_id'),
+                // Installation number is always per-installation (not in the global DR)
                 'installation_number' => $installation->installation_number ?: config('verifactu.software.installation_number', '1'),
-                // Global platform SIF identity (same for every company on this deployment)
-                'vendor_name'         => $platform->vendor_name    ?: config('verifactu.software.vendor_name'),
-                'vendor_tax_id'       => $platform->vendor_tax_id  ?: config('verifactu.software.vendor_tax_id'),
-                'software_id'         => $platform->software_id    ?: config('verifactu.software.id', 'CRATER-VF-01'),
             ],
         ];
 
